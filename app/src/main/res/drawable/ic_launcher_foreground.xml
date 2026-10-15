@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 中英俄塔吉克语图标：抽象的双向箭头 + 中英俄塔 4 种字符 -->
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#0D47A1" />
+
+    <!-- 左侧：中文"译"字简化形象 -->
+    <path
+        android:pathData="M28,38 L46,38 L46,46 L40,46 L40,68 L46,68 L46,76 L28,76 L28,68 L34,68 L34,46 L28,46 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 双向箭头 -->
+    <path
+        android:pathData="M48,54 L62,54 M54,48 L60,54 L54,60 M60,60 L46,60 M54,66 L48,60 L54,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+
+    <!-- 右侧：英文字母 A -->
+    <path
+        android:pathData="M76,40 L86,76 L80,76 L78,68 L70,68 L68,76 L62,76 Z M72,62 L76,62 L74,52 Z"
+        android:fillColor="#FFFFFF" />
+
+</vector>

@@ -1,0 +1,73 @@
+<resources>
+    <string name="app_name">离线翻译</string>
+    <string name="app_subtitle">中 · 英 · 俄 · 塔吉克</string>
+    <string name="share_image_label">用离线翻译打开图片</string>
+
+    <!-- 底部导航 -->
+    <string name="nav_translate">翻译</string>
+    <string name="nav_conversation">对话</string>
+    <string name="nav_image">图片</string>
+    <string name="nav_models">模型</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- 通用 -->
+    <string name="action_swap">交换</string>
+    <string name="action_translate">翻译</string>
+    <string name="action_clear">清空</string>
+    <string name="action_copy">复制</string>
+    <string name="action_paste">粘贴</string>
+    <string name="action_speak">朗读</string>
+    <string name="action_speak_src">朗读原文</string>
+    <string name="action_import">导入</string>
+    <string name="action_delete">删除</string>
+    <string name="action_reload">重新加载</string>
+    <string name="action_open_camera">打开相机</string>
+    <string name="action_pick_image">从相册选择</string>
+    <string name="action_recognize">识别</string>
+    <string name="action_translate_all">翻译全部</string>
+    <string name="action_overlay">覆盖到图片</string>
+    <string name="action_save_image">保存</string>
+
+    <!-- 输入 -->
+    <string name="hint_enter_text">输入文字</string>
+    <string name="hint_hold_to_talk">按住说话</string>
+    <string name="hint_tap_to_talk">点击说话</string>
+    <string name="status_listening">聆听中…</string>
+    <string name="status_recognizing">识别中…</string>
+    <string name="status_translating">翻译中…</string>
+    <string name="status_speaking">朗读中…</string>
+    <string name="status_idle">就绪</string>
+
+    <!-- 模型 -->
+    <string name="model_status_missing">未安装</string>
+    <string name="model_status_ready">已就绪</string>
+    <string name="model_status_loading">加载中…</string>
+    <string name="model_status_error">加载失败</string>
+    <string name="model_internal">内置</string>
+    <string name="model_external">外部导入</string>
+    <string name="model_help">模型放置路径：应用外部存储 /Android/data/com.example.offlinetranslator/files/models/</string>
+
+    <!-- 设置 -->
+    <string name="setting_tts_engine">朗读引擎</string>
+    <string name="setting_tts_system">系统引擎</string>
+    <string name="setting_tts_offline">离线 VITS</string>
+    <string name="setting_dark_theme">深色主题</string>
+    <string name="setting_follow_system">跟随系统</string>
+    <string name="setting_default_direction">默认方向</string>
+    <string name="setting_ocr_mode">OCR 引擎</string>
+    <string name="setting_ocr_mlkit">ML Kit</string>
+
+    <!-- 权限 -->
+    <string name="perm_record_audio_rationale">需要麦克风权限以录制语音进行识别。</string>
+    <string name="perm_camera_rationale">需要相机权限以拍摄文字进行翻译。</string>
+    <string name="perm_grant">授予权限</string>
+
+    <!-- 错误 -->
+    <string name="err_model_missing">模型缺失：%1$s</string>
+    <string name="err_engine_init">引擎初始化失败</string>
+    <string name="err_audio">音频错误</string>
+    <string name="err_image_load">图片加载失败</string>
+
+    <!-- 塔吉克键盘辅助 -->
+    <string name="tg_special_help">塔吉克语字符（西里尔）：Ҷ ҳ Ғ ӣ ӯ Қ Ӯ</string>
+</resources>

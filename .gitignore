@@ -1,0 +1,39 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Android Studio
+.cxx/
+captures/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+local.properties
+
+# Logs
+*.log
+
+# 模型（用户导入的模型文件不进版本控制）
+app/src/main/assets/models/*/
+!app/src/main/assets/models/README.md
+!app/src/main/assets/models/manifest.json
+
+# WorkBuddy 本地缓存（不要传）
+.workbuddy/
+.workbuddy-local/
+
+# Keystore / secrets
+*.jks
+*.keystore
+keystore.properties
+google-services.json

@@ -1,0 +1,17 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 启动主题：与 Compose 主题保持一致 -->
+    <style name="Theme.OfflineTranslator" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/md_theme_light_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+
+    <!-- 相机全屏主题 -->
+    <style name="Theme.OfflineTranslator.Camera" parent="Theme.OfflineTranslator">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+    </style>
+
+</resources>

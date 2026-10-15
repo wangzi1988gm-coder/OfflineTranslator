@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "description": "占位目录。可在此放置内置的离线模型。APK 内置模型随安装包发布，用户也可通过『模型』页导入外部模型到 /Android/data/com.example.offlinetranslator/files/models/ 。",
+  "slots": [
+    {
+      "category": "translator",
+      "key": "zh-en",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 中文→英文"
+    },
+    {
+      "category": "translator",
+      "key": "en-zh",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 英文→中文"
+    },
+    {
+      "category": "translator",
+      "key": "zh-ru",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 中文→俄文"
+    },
+    {
+      "category": "translator",
+      "key": "ru-zh",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 俄文→中文"
+    },
+    {
+      "category": "translator",
+      "key": "ru-tg",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 俄文→塔吉克"
+    },
+    {
+      "category": "translator",
+      "key": "tg-ru",
+      "files": ["encoder.onnx", "decoder.onnx", "source.spm", "target.spm"],
+      "notes": "OPUS-MT 塔吉克→俄文"
+    },
+    {
+      "category": "asr",
+      "key": "zh",
+      "files": ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx Paraformer / Zipformer / Transducer 中文"
+    },
+    {
+      "category": "asr",
+      "key": "en",
+      "files": ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx Whisper Tiny 或 Transducer 英文"
+    },
+    {
+      "category": "asr",
+      "key": "ru",
+      "files": ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx 俄文（塔吉克语兜底）"
+    },
+    {
+      "category": "tts",
+      "key": "zh",
+      "files": ["model.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx VITS 中文"
+    },
+    {
+      "category": "tts",
+      "key": "en",
+      "files": ["model.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx VITS 英文"
+    },
+    {
+      "category": "tts",
+      "key": "ru",
+      "files": ["model.onnx", "tokens.txt"],
+      "notes": "sherpa-onnx VITS 俄文（塔吉克语兜底）"
+    }
+  ]
+}

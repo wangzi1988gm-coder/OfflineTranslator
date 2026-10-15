@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      关键说明：本应用"真正离线"。
+      - 不申请 INTERNET 权限。
+      - 不申请 ACCESS_NETWORK_STATE。
+      所有功能（翻译 / ASR / OCR / TTS）均在本地执行，模型随 APK 打入或由用户在模型管理页一次性导入到 Android/data。
+    -->
+
+    <!-- 录音：语音输入 + 对话模式 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- 相机：拍照翻译 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- 设备特性 -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+
+    <!--
+      注：没有 INTERNET / ACCESS_NETWORK_STATE。
+      注：可选 PACKAGE_USAGE_STATS，但本应用不需要。
+    -->
+
+    <application
+        android:name=".App"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OfflineTranslator"
+        android:usesCleartextTraffic="false"
+        android:largeHeap="true"
+        android:hardwareAccelerated="true"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|locale|layoutDirection|fontScale"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.OfflineTranslator">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- 从图库选择图片触发翻译 -->
+            <intent-filter android:label="@string/share_image_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- ML Kit OCR：本地模型自更新禁用（避免后台联网） -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
+        <!-- 禁用所有 Google Play 服务后台行为：保留 OCR 本地模型即可 -->
+    </application>
+
+</manifest>

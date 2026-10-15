@@ -1,0 +1,107 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: '构建类型 / Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release-unsigned
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # -------- 国内网络加速：替换 JDK / Maven 源 --------
+      - name: 注入 Maven 阿里云镜像
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle.kts <<'EOF'
+          allprojects {
+              repositories {
+                  maven { url = uri("https://maven.aliyun.com/repository/google") }
+                  maven { url = uri("https://maven.aliyun.com/repository/public") }
+                  maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+                  maven { url = uri("https://maven.aliyun.com/repository/central") }
+                  google()
+                  mavenCentral()
+              }
+          }
+          settingsEvaluated {
+              pluginManagement {
+                  repositories {
+                      maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+                      maven { url = uri("https://maven.aliyun.com/repository/google") }
+                      maven { url = uri("https://maven.aliyun.com/repository/public") }
+                      gradlePluginPortal()
+                  }
+              }
+          }
+          EOF
+
+      - name: 设置 JDK 17（阿里云镜像）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          # 国内备选 mirror，若 actions 官方 CDN 不通可改为：
+          # distribution: microsoft
+          # 或在自托管 Runner 上手动 export JAVA_HOME
+
+      - name: 显示环境
+        run: |
+          java -version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la $ANDROID_HOME 2>/dev/null | head -10 || true
+
+      - name: 接受 Android SDK 许可
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+
+      - name: 创建 local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: 授予 Gradle 执行权限
+        run: chmod +x gradlew
+
+      - name: 构建 Debug APK
+        if: github.event_name != 'workflow_dispatch' || inputs.build_type == 'debug'
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: 构建 Release（未签名）APK
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'release-unsigned'
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: 收集 APK 文件
+        id: collect
+        run: |
+          mkdir -p out
+          cp -v app/build/outputs/apk/debug/app-debug.apk out/ 2>/dev/null || true
+          cp -v app/build/outputs/apk/release/app-release-unsigned.apk out/ 2>/dev/null || true
+          cp -v app/build/outputs/apk/debug/output-metadata.json out/ 2>/dev/null || true
+          cp -v app/build/outputs/apk/release/output-metadata.json out/ 2>/dev/null || true
+          ls -la out/
+
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
