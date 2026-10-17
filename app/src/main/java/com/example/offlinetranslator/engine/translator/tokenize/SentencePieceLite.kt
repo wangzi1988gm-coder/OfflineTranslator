@@ -85,27 +85,95 @@ class SentencePieceLite {
          * 每个 piece Message 包含 piece (field 1)、score (field 2)。
          */
         fun loadFromSpmModel(file: File): SentencePieceLite {
-            val bytes = Files.readAllBytes(Paths.get(file.toURI()))
-            val text = String(bytes, Charsets.ISO_8859_1)
-            // 启发式：找出所有带 ▁/</s>/<s>/<unk> 的可打印片段
-            val pieceRegex = Regex("[\\x20-\\x7E]+")
-            val raw = pieceRegex.findAll(text).map { it.value }.toList()
+            val bytes = file.readBytes()
             val pieces = mutableListOf<String>()
-            val seen = HashSet<String>()
-            for (r in raw) {
-                val cleaned = r.trim().trimStart('\u0001').trimEnd('\u0000').trim()
-                if (cleaned.isEmpty()) continue
-                if (cleaned.length > 40) continue
-                if (cleaned in seen) continue
-                seen += cleaned
-                pieces += cleaned
+            val scores = mutableListOf<Float>()
+            var pos = 0
+
+            // SentencePiece ModelProto stores each piece as repeated field 1 (length-delimited).
+            while (pos < bytes.size) {
+                val tag = readVarint(bytes, pos)
+                pos = tag.second
+                val field = (tag.first ushr 3).toInt()
+                val wire = (tag.first and 7L).toInt()
+                if (field == 1 && wire == 2) {
+                    val lengthResult = readVarint(bytes, pos)
+                    val length = lengthResult.first.toInt()
+                    pos = lengthResult.second
+                    if (length < 0 || pos + length > bytes.size) break
+                    val pieceBytes = bytes.copyOfRange(pos, pos + length)
+                    pos += length
+                    val parsed = parsePiece(pieceBytes)
+                    if (parsed.first.isNotEmpty()) {
+                        pieces += parsed.first
+                        scores += parsed.second
+                    }
+                } else {
+                    pos = skipField(bytes, pos, wire)
+                }
             }
-            // 兜底：特殊 token 必须在表里
-            listOf(BOS_TOKEN, EOS_TOKEN, PAD_TOKEN, UNK_TOKEN).forEach {
-                if (it !in seen) pieces += it
+
+            require(pieces.isNotEmpty()) { "无法解析 SentencePiece 模型：${file.name}" }
+            return SentencePieceLite(pieces, scores.toFloatArray())
+        }
+
+        private fun parsePiece(bytes: ByteArray): Pair<String, Float> {
+            var pos = 0
+            var piece = ""
+            var score = 0f
+            while (pos < bytes.size) {
+                val tag = readVarint(bytes, pos)
+                pos = tag.second
+                val field = (tag.first ushr 3).toInt()
+                val wire = (tag.first and 7L).toInt()
+                when {
+                    field == 1 && wire == 2 -> {
+                        val lengthResult = readVarint(bytes, pos)
+                        val length = lengthResult.first.toInt()
+                        pos = lengthResult.second
+                        if (length < 0 || pos + length > bytes.size) break
+                        piece = String(bytes, pos, length, StandardCharsets.UTF_8)
+                        pos += length
+                    }
+                    field == 2 && wire == 5 -> {
+                        if (pos + 4 > bytes.size) break
+                        val bits = (bytes[pos].toInt() and 0xff) or
+                            ((bytes[pos + 1].toInt() and 0xff) shl 8) or
+                            ((bytes[pos + 2].toInt() and 0xff) shl 16) or
+                            ((bytes[pos + 3].toInt() and 0xff) shl 24)
+                        score = java.lang.Float.intBitsToFloat(bits)
+                        pos += 4
+                    }
+                    else -> pos = skipField(bytes, pos, wire)
+                }
             }
-            val scores = FloatArray(pieces.size) { 0f }
-            return SentencePieceLite(pieces, scores)
+            return piece to score
+        }
+
+        private fun readVarint(bytes: ByteArray, start: Int): Pair<Long, Int> {
+            var pos = start
+            var result = 0L
+            var shift = 0
+            while (pos < bytes.size && shift < 64) {
+                val b = bytes[pos++].toInt() and 0xff
+                result = result or ((b and 0x7f).toLong() shl shift)
+                if ((b and 0x80) == 0) return result to pos
+                shift += 7
+            }
+            return result to pos
+        }
+
+        private fun skipField(bytes: ByteArray, start: Int, wire: Int): Int {
+            return when (wire) {
+                0 -> readVarint(bytes, start).second
+                1 -> (start + 8).coerceAtMost(bytes.size)
+                2 -> {
+                    val length = readVarint(bytes, start)
+                    (length.second + length.first.toInt()).coerceAtMost(bytes.size)
+                }
+                5 -> (start + 4).coerceAtMost(bytes.size)
+                else -> bytes.size
+            }
         }
     }
 
