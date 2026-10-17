@@ -47,12 +47,8 @@ class SystemTtsEngine(private val context: Context) : TtsEngine {
 
     suspend fun awaitReady(): Boolean = initResult.await()
 
-    override fun isReady(language: Language): Boolean {
-        if (!initialized) return false
-        val loc = localeFor(language)
-        val res = tts?.setLanguage(loc) ?: TextToSpeech.LANG_NOT_SUPPORTED
-        return res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
-    }
+    override fun isReady(language: Language): Boolean =
+        initialized && offlineVoiceFor(language) != null
 
     override suspend fun speak(text: String, language: Language, rate: Float, pitch: Float): TtsResult =
         suspendCancellableCoroutine { cont ->
@@ -61,20 +57,18 @@ class SystemTtsEngine(private val context: Context) : TtsEngine {
                     cont.resume(TtsResult(false, engineId, language, warning = "TTS 未初始化"))
                     return@suspendCancellableCoroutine
                 }
-                val loc = localeFor(language)
-                val res = tts?.setLanguage(loc) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                val fallbackWarning: String? = when (res) {
-                    TextToSpeech.LANG_MISSING_DATA, TextToSpeech.LANG_NOT_SUPPORTED -> {
-                        // 塔吉克语回退到俄语
-                        if (language == Language.TG) {
-                            tts?.setLanguage(Locale("ru"))
-                            "塔吉克语未支持，使用俄语朗读"
-                        } else {
-                            "系统 TTS 未安装 ${language.displayName} 语音数据"
-                        }
+                val voice = offlineVoiceFor(language)
+                    ?: run {
+                        cont.resume(
+                            TtsResult(
+                                false, engineId, language,
+                                warning = "没有可用的离线语音包：${language.displayName}。请安装本地语音数据或导入离线 TTS 模型。"
+                            )
+                        )
+                        return@suspendCancellableCoroutine
                     }
-                    else -> null
-                }
+                tts?.voice = voice
+                val fallbackWarning = if (language == Language.TG) "塔吉克语系统语音不可用，使用俄语离线语音朗读" else null
                 tts?.setSpeechRate(rate)
                 tts?.setPitch(pitch)
                 val utteranceId = "utt-${System.currentTimeMillis()}"
@@ -110,6 +104,14 @@ class SystemTtsEngine(private val context: Context) : TtsEngine {
         Language.EN -> Locale.US
         Language.RU -> Locale("ru", "RU")
         Language.TG -> Locale("ru", "RU") // tg 回退到 ru
+    }
+
+    /** Only choose locally installed voices; never select a voice that requires network access. */
+    private fun offlineVoiceFor(language: Language): android.speech.tts.Voice? {
+        val target = localeFor(language)
+        val voices = tts?.voices.orEmpty().filter { !it.isNetworkConnectionRequired }
+        return voices.firstOrNull { it.locale == target }
+            ?: voices.firstOrNull { it.locale.language == target.language }
     }
 
     companion object {
