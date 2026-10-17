@@ -10,6 +10,7 @@ import com.example.offlinetranslator.data.ModelPack
 import com.example.offlinetranslator.data.ModelSlots
 import com.example.offlinetranslator.model.ModelManager
 import com.example.offlinetranslator.model.ModelStorage
+import com.example.offlinetranslator.engine.translator.TranslatorRouter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,12 +25,16 @@ import java.io.File
 class ModelManageViewModel(
     val modelStorage: ModelStorage,
     private val modelManager: ModelManager,
+    private val translatorRouter: TranslatorRouter,
 ) : ViewModel() {
 
     val packs: StateFlow<List<ModelPack>> = modelManager.packs
     val loading: StateFlow<Boolean> = modelManager.loading
 
-    suspend fun refresh() = modelManager.refresh()
+    suspend fun refresh() {
+        modelManager.refresh()
+        withContext(Dispatchers.IO) { translatorRouter.preloadAll() }
+    }
 
     fun delete(pack: ModelPack) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -43,6 +48,7 @@ class ModelManageViewModel(
             // DocumentFile 树 → 拷贝到 modelStorage.modelsRoot
             copyTreeToModels(context, tree)
             modelManager.refresh()
+            translatorRouter.preloadAll()
         }
     }
 
