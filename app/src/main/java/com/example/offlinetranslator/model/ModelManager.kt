@@ -82,25 +82,122 @@ class ModelManager(
         manifest.save(_packs.value)
     }
 
-    /** 用户导入的模型根目录拷贝（通过 SAF 选择的目录） */
+    /** 用户导入模型目录。支持完整 models 根目录、category 目录或单个模型目录。 */
     suspend fun importDirectory(srcDir: File): List<ModelPack> = withContext(Dispatchers.IO) {
         require(srcDir.isDirectory) { "srcDir 必须为目录" }
-        val detected = detectPacksInDir(srcDir)
-        if (detected.isEmpty()) return@withContext emptyList()
 
-        // 拷贝到 modelsRoot/<rootDir>
-        val newPacks = detected.mapNotNull { detected ->
-            val dest = File(storage.modelsRoot, detected.rootDir)
-            dest.mkdirs()
-            srcDir.copyRecursively(dest, overwrite = true)
-            detected.copy(source = ModelSource.USER_IMPORTED).also {
-                // 重算大小
-                val size = dest.walkTopDown().filter { it.isFile }.sumOf { it.length() }
-                _packs.value = _packs.value + it.copy(sizeBytes = size)
+        data class Candidate(
+            val category: ModelCategory,
+            val directory: File,
+            val slotKey: String,
+            val engineImpl: String,
+            val primaryFile: String,
+        )
+
+        fun candidate(dir: File, category: ModelCategory): Candidate? {
+            val files = dir.walkTopDown().filter { it.isFile }.toList()
+            val onnx = files.firstOrNull { it.extension.equals("onnx", ignoreCase = true) }
+            val modelFile = onnx ?: files.firstOrNull { it.extension.equals("bin", ignoreCase = true) }
+            val tokens = files.firstOrNull { it.name.equals("tokens.txt", ignoreCase = true) }
+
+            return when (category) {
+                ModelCategory.TRANSLATOR -> {
+                    if (onnx == null) null else Candidate(
+                        category, dir, dir.name,
+                        if (dir.name.lowercase().startsWith("nllb")) "NLLB_200" else "MARIAN_MT",
+                        onnx.name,
+                    )
+                }
+                ModelCategory.ASR -> {
+                    if (onnx == null || tokens == null) null else Candidate(
+                        category, dir, "asr-${dir.name}", "SHERPA_ONNX", tokens.name,
+                    )
+                }
+                ModelCategory.TTS -> {
+                    if (modelFile == null) null else Candidate(
+                        category, dir, "tts-${dir.name}", "SHERPA_ONNX_VITS", modelFile.name,
+                    )
+                }
+                ModelCategory.OCR -> null
             }
         }
-        manifest.save(_packs.value)
-        newPacks
+
+        val categories = mapOf(
+            "translator" to ModelCategory.TRANSLATOR,
+            "asr" to ModelCategory.ASR,
+            "tts" to ModelCategory.TTS,
+        )
+        val candidates = mutableListOf<Candidate>()
+        val rootCategory = categories[srcDir.name.lowercase()]
+        if (rootCategory != null) {
+            val children = srcDir.listFiles()?.filter { it.isDirectory }.orEmpty()
+            if (children.isEmpty()) candidate(srcDir, rootCategory)?.let(candidates::add)
+            else children.forEach { modelDir -> candidate(modelDir, rootCategory)?.let(candidates::add) }
+        } else {
+            var foundStructuredRoot = false
+            categories.forEach { (folderName, category) ->
+                val categoryDir = File(srcDir, folderName)
+                if (categoryDir.isDirectory) {
+                    foundStructuredRoot = true
+                    categoryDir.listFiles()?.filter { it.isDirectory }.orEmpty().forEach { modelDir ->
+                        candidate(modelDir, category)?.let(candidates::add)
+                    }
+                }
+            }
+            if (!foundStructuredRoot) {
+                val hasModel = srcDir.walkTopDown().any {
+                    it.isFile && (it.extension.equals("onnx", true) || it.extension.equals("bin", true))
+                }
+                if (hasModel) {
+                    val files = srcDir.walkTopDown().filter { it.isFile }.toList()
+                    val hasTokens = files.any { it.name.equals("tokens.txt", true) }
+                    val name = srcDir.name.lowercase()
+                    val inferred = when {
+                        name.startsWith("tts-") || name.contains("vits") || name.contains("piper") ->
+                            ModelCategory.TTS
+                        hasTokens -> ModelCategory.ASR
+                        else -> ModelCategory.TRANSLATOR
+                    }
+                    candidate(srcDir, inferred)?.let(candidates::add)
+                }
+            }
+        }
+
+        if (candidates.isEmpty()) return@withContext emptyList()
+
+        val installed = _packs.value.toMutableList()
+        val imported = candidates.map { item ->
+            val relativeRoot = when (item.category) {
+                ModelCategory.TRANSLATOR -> "translator/${item.slotKey}"
+                ModelCategory.ASR -> "asr/${item.slotKey.removePrefix("asr-")}"
+                ModelCategory.TTS -> "tts/${item.slotKey.removePrefix("tts-")}"
+                ModelCategory.OCR -> error("OCR models are bundled with the app")
+            }
+            val destination = File(storage.modelsRoot, relativeRoot)
+            destination.deleteRecursively()
+            destination.parentFile?.mkdirs()
+            item.directory.copyRecursively(destination, overwrite = true)
+            val size = destination.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            ModelPack(
+                slotKey = item.slotKey,
+                category = item.category,
+                engineImpl = item.engineImpl,
+                source = ModelSource.USER_IMPORTED,
+                rootDir = relativeRoot,
+                primaryFile = item.primaryFile,
+                sizeBytes = size,
+            )
+        }
+
+        imported.forEach { pack ->
+            installed.removeAll {
+                it.category == pack.category && it.slotKey == pack.slotKey
+            }
+            installed.add(pack)
+        }
+        _packs.value = installed
+        manifest.save(installed)
+        imported
     }
 
     // ---------- 私有：扫描 ----------
@@ -225,47 +322,4 @@ class ModelManager(
             .map { (_, list) -> list.maxBy { priority[it.source] ?: 0 } }
     }
 
-    private fun detectPacksInDir(dir: File): List<ModelPack> {
-        val out = mutableListOf<ModelPack>()
-        val onnx = dir.walkTopDown().firstOrNull { it.isFile && it.name.endsWith(".onnx") }
-        if (onnx != null) {
-            val rel = dir.name
-            out += ModelPack(
-                slotKey = rel,
-                category = ModelCategory.TRANSLATOR,
-                engineImpl = detectTranslatorImpl(dir),
-                source = ModelSource.USER_IMPORTED,
-                rootDir = "translator/$rel",
-                primaryFile = onnx.name,
-                sizeBytes = -1,
-            )
-        }
-        // 检查 ASR 特征文件
-        val tokens = dir.walkTopDown().firstOrNull { it.isFile && it.name == "tokens.txt" }
-        if (tokens != null) {
-            out += ModelPack(
-                slotKey = "asr-${dir.name}",
-                category = ModelCategory.ASR,
-                engineImpl = "SHERPA_ONNX",
-                source = ModelSource.USER_IMPORTED,
-                rootDir = "asr/${dir.name}",
-                primaryFile = tokens.name,
-                sizeBytes = -1,
-            )
-        }
-        // TTS
-        val vits = dir.walkTopDown().firstOrNull { it.isFile && (it.name.endsWith(".onnx") || it.name.endsWith(".bin")) && dir.listFiles()?.any { it.name.contains("vits") } == true }
-        if (vits != null && tokens == null) {
-            out += ModelPack(
-                slotKey = "tts-${dir.name}",
-                category = ModelCategory.TTS,
-                engineImpl = "SHERPA_ONNX_VITS",
-                source = ModelSource.USER_IMPORTED,
-                rootDir = "tts/${dir.name}",
-                primaryFile = vits.name,
-                sizeBytes = -1,
-            )
-        }
-        return out
-    }
 }
