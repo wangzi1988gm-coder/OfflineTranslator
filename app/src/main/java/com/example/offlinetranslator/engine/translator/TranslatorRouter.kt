@@ -49,16 +49,26 @@ class TranslatorRouter(
     private fun rebuildCascade() {
         cascadeEngines.clear()
 
-        // 中文 → 塔吉克：必须同时存在 zh-ru 与 ru-tg 两个方向的模型。
-        val zhRu = directEngines["zh-ru"]
+        // 中↔俄：当前模型包提供中↔英、英↔俄时，自动通过英语级联。
+        val zhEn = directEngines["zh-en"]
+        val enRu = directEngines["en-ru"]
+        if (zhEn != null && enRu != null) {
+            cascadeEngines["zh-ru"] = CascadeTranslator(zhEn, enRu, Language.EN)
+        }
+        val ruEn = directEngines["ru-en"]
+        val enZh = directEngines["en-zh"]
+        if (ruEn != null && enZh != null) {
+            cascadeEngines["ru-zh"] = CascadeTranslator(ruEn, enZh, Language.EN)
+        }
+
+        // 中↔塔吉克：优先使用中文↔俄语与俄语↔塔吉克的直接模型组合。
+        val zhRu = directEngines["zh-ru"] ?: cascadeEngines["zh-ru"]
         val ruTg = directEngines["ru-tg"]
         if (zhRu != null && ruTg != null) {
             cascadeEngines["zh-tg"] = CascadeTranslator(zhRu, ruTg, Language.RU)
         }
-
-        // 塔吉克 → 中文：必须同时存在 tg-ru 与 ru-zh 两个方向的模型。
         val tgRu = directEngines["tg-ru"]
-        val ruZh = directEngines["ru-zh"]
+        val ruZh = directEngines["ru-zh"] ?: cascadeEngines["ru-zh"]
         if (tgRu != null && ruZh != null) {
             cascadeEngines["tg-zh"] = CascadeTranslator(tgRu, ruZh, Language.RU)
         }
