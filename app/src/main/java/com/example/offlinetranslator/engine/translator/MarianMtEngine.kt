@@ -47,6 +47,8 @@ class MarianMtEngine(
     private var tgtSpm: SentencePieceLite? = null
     private var slotKey: String? = null
     private var maxLength: Int = 128
+    private var decoderStartId: Int = 65000
+    private var eosId: Int = 0
 
     @Volatile
     private var loaded: Boolean = false
@@ -58,16 +60,26 @@ class MarianMtEngine(
         return try {
             unload()
             val root = File(storage.modelsRoot, pack.rootDir)
-            val encoder = File(root, "encoder.onnx")
-            val decoder = File(root, "decoder.onnx")
+            val encoder = File(root, "encoder.onnx").takeIf { it.isFile }
+                ?: File(root, "encoder_model.onnx")
+            val decoder = File(root, "decoder.onnx").takeIf { it.isFile }
+                ?: File(root, "decoder_model.onnx")
             val decoderLm = File(root, "decoder_with_lm_head.onnx")
             val srcSpmFile = File(root, "source.spm")
             val tgtSpmFile = File(root, "target.spm")
             val vocabSrc = File(root, "vocab.src")
             val vocabTgt = File(root, "vocab.tgt")
 
-            require(encoder.exists()) { "缺少 encoder.onnx" }
-            require(decoder.exists() || decoderLm.exists()) { "缺少 decoder*.onnx" }
+            require(encoder.isFile) { "缺少 encoder.onnx / encoder_model.onnx" }
+            require(decoder.isFile || decoderLm.isFile) { "缺少 decoder*.onnx" }
+
+            // OPUS-MT Marian exports usually use PAD (65000) as decoder start and EOS (0).
+            val configText = File(root, "config.json").takeIf { it.isFile }?.readText().orEmpty()
+            decoderStartId = Regex("\\\"decoder_start_token_id\\\"\\s*:\\s*(\\d+)")
+                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 65000
+            eosId = Regex("\\\"eos_token_id\\\"\\s*:\\s*(\\d+)")
+                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: tgtSpm?.idOrUnk(SentencePieceLite.EOS_TOKEN) ?: 0
 
             val env = OrtEnvironment.getEnvironment()
             val opts = OrtSession.SessionOptions().apply {
@@ -101,6 +113,9 @@ class MarianMtEngine(
             } else null
 
             require(srcSpm != null && tgtSpm != null) { "缺少 SPM / vocab 文件" }
+            eosId = Regex("\\\"eos_token_id\\\"\\s*:\\s*(\\d+)")
+                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: tgtSpm!!.idOrUnk(SentencePieceLite.EOS_TOKEN)
 
             slotKey = pack.slotKey
             loaded = true
@@ -157,7 +172,7 @@ class MarianMtEngine(
             val decEnv = OrtEnvironment.getEnvironment()
             val hiddenTensor = OnnxTensor.createTensor(decEnv, hiddenStates)
             var lastTokens: IntArray = tgtIds.toIntArray()
-            repeat(maxLength - 1) {
+            for (step in 0 until maxLength - 1) {
                 val tgtArr = LongArray(lastTokens.size) { lastTokens[it].toLong() }
                 val tgtTensor = OnnxTensor.createTensor(
                     decEnv, LongBuffer.wrap(tgtArr), longArrayOf(1, tgtArr.size.toLong())
@@ -171,7 +186,8 @@ class MarianMtEngine(
                 val lastStep = logits[0][logits[0].size - 1]
                 val nextId = argmax(lastStep)
                 runCatching { logitsOut.close() }
-                if (nextId == eosId) return@repeat
+                runCatching { tgtTensor.close() }
+                if (nextId == eosId) break
                 tgtIds += nextId
                 lastTokens = tgtIds.toIntArray()
             }
