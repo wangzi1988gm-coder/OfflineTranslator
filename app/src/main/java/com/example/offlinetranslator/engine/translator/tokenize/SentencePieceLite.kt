@@ -184,8 +184,8 @@ class SentencePieceLite {
      */
     fun encode(text: String, maxLength: Int = 256): IntArray {
         val out = ArrayList<Int>(text.length / 2 + 4)
-        out += idOrUnk(BOS_TOKEN)
-        val normalized = text.replace(' ', SPACE_MARKER_CHAR)
+        // SentencePiece normalizes the beginning of a sentence to the ▁ marker.
+        val normalized = SPACE_MARKER + text.trim().replace(' ', SPACE_MARKER_CHAR)
         var i = 0
         while (i < normalized.length) {
             var matched = -1
