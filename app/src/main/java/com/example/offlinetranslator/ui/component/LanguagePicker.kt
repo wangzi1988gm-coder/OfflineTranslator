@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.offlinetranslator.data.Language
+import com.example.offlinetranslator.data.LanguagePair
 
 @Composable
 fun LanguagePicker(
@@ -46,9 +47,10 @@ fun LanguagePicker(
     onSelect: (Language) -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    options: List<Language> = Language.values().toList(),
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val allLanguages = remember { Language.values().toList() }
+    val allLanguages = options
 
     OutlinedCard(
         modifier = modifier,
@@ -97,10 +99,17 @@ fun DirectionPad(
     from: Language,
     to: Language,
     onSwap: () -> Unit,
+    onFromSelect: (Language) -> Unit,
+    onToSelect: (Language) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        LanguagePicker(selected = from, onSelect = {}, modifier = Modifier.weight(1f))
+        LanguagePicker(
+            selected = from,
+            onSelect = onFromSelect,
+            modifier = Modifier.weight(1f),
+            options = Language.values().toList(),
+        )
         Spacer(Modifier.width(8.dp))
         Surface(
             modifier = Modifier.size(40.dp),
@@ -117,6 +126,11 @@ fun DirectionPad(
             }
         }
         Spacer(Modifier.width(8.dp))
-        LanguagePicker(selected = to, onSelect = {}, modifier = Modifier.weight(1f))
+        LanguagePicker(
+            selected = to,
+            onSelect = onToSelect,
+            modifier = Modifier.weight(1f),
+            options = LanguagePair.ALL.filter { it.from == from }.map { it.to },
+        )
     }
 }
