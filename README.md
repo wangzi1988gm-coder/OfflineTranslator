@@ -36,7 +36,7 @@
 - Kotlin 2.0 + Jetpack Compose（Material3）
 - AndroidX 13+（Navigation、DataStore、Room、CameraX）
 - ONNX Runtime Mobile 1.19.x（NMT 推理）
-- sherpa-onnx 1.10.x（离线 ASR + TTS）
+- sherpa-onnx 1.13.8（离线 ASR + TTS）
 - Google ML Kit Text Recognition（本地 OCR）
 
 ## 3. 目录结构
