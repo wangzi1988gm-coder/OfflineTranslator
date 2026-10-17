@@ -19,6 +19,11 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest build for this branch running while iterating.
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build APK
