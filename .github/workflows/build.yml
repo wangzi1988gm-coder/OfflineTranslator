@@ -53,7 +53,7 @@ jobs:
         run: |
           java -version
           gradle --version
-          sdkmanager --list_installed
+          sdkmanager --version
 
       - name: Verify strict offline manifest
         run: |
