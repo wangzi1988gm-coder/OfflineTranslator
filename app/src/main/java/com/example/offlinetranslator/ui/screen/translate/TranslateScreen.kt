@@ -1,9 +1,5 @@
 package com.example.offlinetranslator.ui.screen.translate
 
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -69,33 +65,16 @@ fun TranslateScreen(
 
     val context = LocalContext.current
 
-    val asrLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { res ->
-        if (res.resultCode == Activity.RESULT_OK) {
-            val text = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!text.isNullOrBlank()) vm.setSource(text)
-        }
-    }
-
     val pickImage = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) onOpenImage()
     }
 
-    fun launchSystemAsr(lang: Language) {
-        val localeTag = lang.bcp47
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "请开始说话")
-        }
-        try {
-            asrLauncher.launch(intent)
-        } catch (_: Throwable) {
-            Toast.makeText(context, "系统未提供语音识别，请使用本地 ASR（见模型页）", Toast.LENGTH_LONG).show()
-        }
+    // 严格离线：不调用可能依赖云端的系统语音识别 Intent。
+    // 对话页使用应用内 sherpa-onnx ASR；模型未安装时会显示本地提示。
+    fun launchOfflineAsr() {
+        onOpenConversation()
     }
 
     Column(
@@ -125,7 +104,7 @@ fun TranslateScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             AssistChipButton("粘贴", Icons.Default.ContentPaste, { vm.pasteFromClipboard(context) }, Modifier.weight(1f))
-            AssistChipButton("听写", Icons.Default.Mic, { launchSystemAsr(from) }, Modifier.weight(1f))
+            AssistChipButton("离线听写", Icons.Default.Mic, { launchOfflineAsr() }, Modifier.weight(1f))
             AssistChipButton("相册", Icons.Default.PhotoLibrary, { pickImage.launch("image/*") }, Modifier.weight(1f))
             AssistChipButton("相机", Icons.Default.PhotoCamera, onOpenImage, Modifier.weight(1f))
         }
