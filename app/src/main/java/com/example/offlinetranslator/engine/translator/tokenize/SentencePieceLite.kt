@@ -38,7 +38,7 @@ class SentencePieceLite {
     constructor(pieces: List<String>, scores: FloatArray) {
         this.pieces = pieces.toTypedArray()
         this.scores = scores
-        this.pieceToId = HashMap(pieces.size * 2).apply {
+        this.pieceToId = HashMap<String, Int>(pieces.size * 2).apply {
             for ((i, p) in pieces.withIndex()) put(p, i)
         }
     }
@@ -71,7 +71,7 @@ class SentencePieceLite {
                 if (s.isEmpty() || s.startsWith("#")) return@mapNotNull null
                 val parts = s.split('\t', ' ', limit = 2)
                 if (parts.size < 2) return@mapNotNull null
-                val piece = parts[0].replace(SPACE_MARKER, ' ')
+                val piece = parts[0]
                 val score = parts[1].toFloatOrNull() ?: 0f
                 piece to score
             }
