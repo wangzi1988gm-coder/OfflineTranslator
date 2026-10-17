@@ -116,7 +116,7 @@ class ModelManager(
                     val tokenizerTgt = file("target.spm") ?: file("vocab.tgt")
                     if (encoder == null || decoder == null || tokenizerSrc == null || tokenizerTgt == null) null
                     else Candidate(
-                        category, dir, dir.name,
+                        category, dir, inferTranslatorSlotKey(dir.name),
                         if (dir.name.lowercase().startsWith("nllb")) "NLLB_200" else "MARIAN_MT",
                         encoder.name,
                     )
@@ -326,6 +326,15 @@ class ModelManager(
             }
         }
         return out
+    }
+
+    /** Map common Hugging Face folder names (for example opus-mt-zh-en) to router slot IDs. */
+    private fun inferTranslatorSlotKey(directoryName: String): String {
+        val normalized = directoryName.lowercase().replace('_', '-')
+        val supportedPairs = listOf("zh-en", "en-zh", "ru-en", "en-ru", "zh-ru", "ru-zh", "ru-tg", "tg-ru")
+        return supportedPairs.firstOrNull { pair ->
+            Regex("(^|-)"+ pair + "($|-)").containsMatchIn(normalized)
+        } ?: directoryName
     }
 
     private fun detectTranslatorImpl(dir: File): String {
