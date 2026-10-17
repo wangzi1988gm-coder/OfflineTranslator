@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import kotlin.math.min
 
 /**
@@ -99,7 +99,7 @@ class AudioRecorder(private val context: Context) {
     suspend fun recordToFile(target: File, maxDurationMs: Int = 30_000): Int = withContext(Dispatchers.IO) {
         if (!start()) return@withContext -1
         try {
-            val out = FileOutputStream(target)
+            val out = RandomAccessFile(target, "rw").apply { setLength(0) }
             // 写占位 wav 头（44 字节），结束时回填
             val header = ByteArray(44)
             out.write(header)
