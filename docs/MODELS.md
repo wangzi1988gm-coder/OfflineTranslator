@@ -4,11 +4,13 @@
 
 ## 1. 总览
 
+**状态说明：** 本文区分“文件可下载”“APP 可识别”“ONNX 推理通过”和“语种效果经过验证”。这些是不同阶段。当前四个翻译方向模型只是候选权重，不能据此宣称完整的离线语音识别、语音合成和塔吉克语翻译已经完成。
+
 | 类别 | 模型 | 推荐来源 | 推荐大小 | 备注 |
 | --- | --- | --- | --- | --- |
-| 翻译 | zh↔en | Helsinki-NLP/OPUS-MT | 300 MB/方向 | INT8 量化 |
-| 翻译 | zh↔ru | Helsinki-NLP/OPUS-MT | 300 MB/方向 | INT8 |
-| 翻译 | ru↔tg | Helsinki-NLP/OPUS-MT | 150 MB/方向 | 小型数据集 |
+| 翻译 | zh↔en | OPUS-MT Marian / ONNX | 约 230 MB/方向（本模型包） | 已下载候选权重，仍需真机推理验证 |
+| 翻译 | en↔ru | OPUS-MT Marian / ONNX | 约 230 MB/方向（本模型包） | 可与中↔英模型级联得到中↔俄 |
+| 翻译 | ru↔tg | 需另找兼容模型 | 未确认 | 当前模型包不包含塔吉克语翻译权重 |
 | ASR | zh | sherpa-onnx Paraformer | 250 MB | 流式 |
 | ASR | en | sherpa-onnx Whisper Tiny | 75 MB | 多语言通用 |
 | ASR | ru | sherpa-onnx 俄文 Paraformer | 250 MB | 塔吉克兜底 |
@@ -75,17 +77,11 @@ translator/zh-en/
 
 ### 2.3 塔吉克语（ru↔tg）
 
-塔吉克语 OPUS-MT 模型在 HuggingFace 上以 Helsinki-NLP/OPUS-MT 仓库提供：
-- `Helsinki-NLP/opus-mt-ru-tg`（俄→塔吉克）
-- `Helsinki-NLP/opus-mt-tg-ru`（塔吉克→俄）
+当前已下载的 `zh-en`、`en-zh`、`ru-en`、`en-ru` 模型中没有塔吉克语词表或权重，因此不能据此声称支持离线中↔塔吉克语。必须另外找到真实存在、许可证允许且可转换为当前 Marian ONNX 接口的 ru↔tg 模型，并在设备上验证推理；不能仅凭模型仓库命名推断它存在或兼容。
 
-按相同流程导出 ONNX。
+### 2.4 级联翻译
 
-### 2.4 zh↔tg / en↔tg（级联）
-
-直接 NMT 模型少。本工程走 `zh→ru→tg` / `en→ru→tg` 级联：
-- 需要 `zh↔ru` 和 `ru↔tg` 两套模型。
-- `TranslatorRouter` 自动组合，无需用户配置。
+当前路由器可用 `zh-en + en-ru` 组合实现中↔俄两段翻译；需要每一段方向都具备相应模型。中↔塔吉克仍然需要包含塔吉克语的模型段（例如 ru↔tg），现有四个模型不能单独完成该功能。
 
 ## 3. ASR 模型（sherpa-onnx）
 
@@ -143,15 +139,14 @@ tts/zh/
 
 ### 4.3 塔吉克语 TTS
 
-塔吉克语 TTS 模型暂缺开源版本。本工程使用 **俄文 VITS 兜底**（塔吉克语采用西里尔字母，俄文模型基本可读）。
-- 效果：发音基本正确，但语调偏俄语。
+目前没有随模型包提供经过验证的塔吉克语 TTS 权重。俄文 TTS 即使能够朗读西里尔字母，也不代表它能正确读出塔吉克语的发音与重音；在验证前只能视为可选的近似朗读方案，不能称为塔吉克语语音支持。
 
 ## 5. OCR
 
 OCR 使用 **Google ML Kit Text Recognition**，模型随 APK 自带，**无需手动下载**。
 - 拉丁字母识别器：`com.google.mlkit:text-recognition`（默认拉丁）
 - 中文识别器：`com.google.mlkit:text-recognition-chinese`
-- 塔吉克语（西里尔）由拉丁识别器兜底识别（西里尔是 ML Kit 拉丁识别器的子支持集）。
+- 塔吉克语（西里尔）需要确认对应识别模型的脚本支持；拉丁字母识别器不能被视为西里尔语种的可靠兜底。
 
 ## 6. 模型导入方式
 
