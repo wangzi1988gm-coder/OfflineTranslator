@@ -112,28 +112,42 @@ class SherpaOnnxAsrEngine(
             val recognizer = recognizers[language]
                 ?: throw AsrNotReadyException("ASR 未就绪: $language")
             val stream = recognizer.createStream()
-            val chunkSize = 4096
-            var pos = 0
-            val sb = StringBuilder()
-            while (pos < samples.size) {
-                val end = minOf(pos + chunkSize, samples.size)
-                val chunk = samples.copyOfRange(pos, end)
-                stream.acceptWaveform(chunk, sampleRate)
+            val completed = StringBuilder()
+            try {
+                val chunkSize = 4096
+                var pos = 0
+                while (pos < samples.size) {
+                    val end = minOf(pos + chunkSize, samples.size)
+                    val chunk = samples.copyOfRange(pos, end)
+                    stream.acceptWaveform(chunk, sampleRate)
+                    while (recognizer.isReady(stream)) {
+                        recognizer.decode(stream)
+                    }
+                    if (recognizer.isEndpoint(stream)) {
+                        val segment = recognizer.getResult(stream).text.trim()
+                        if (segment.isNotBlank()) {
+                            if (completed.isNotEmpty()) completed.append(' ')
+                            completed.append(segment)
+                        }
+                        recognizer.reset(stream)
+                    }
+                    pos = end
+                }
+
+                // Flush a short silence so the last unfinished segment can be finalized.
+                stream.acceptWaveform(FloatArray(8_000), 16_000)
                 while (recognizer.isReady(stream)) {
                     recognizer.decode(stream)
                 }
-                val r = recognizer.getResult(stream)
-                if (r.text.isNotBlank()) {
-                    sb.clear()
-                    sb.append(r.text)
+                val finalSegment = recognizer.getResult(stream).text.trim()
+                if (finalSegment.isNotBlank()) {
+                    if (completed.isNotEmpty()) completed.append(' ')
+                    completed.append(finalSegment)
                 }
-                if (recognizer.isEndpoint(stream)) {
-                    recognizer.reset(stream)
-                }
-                pos = end
+                completed.toString().trim()
+            } finally {
+                stream.release()
             }
-            stream.release()
-            sb.toString().trim()
         }
 
     override fun createStreaming(language: Language): StreamingAsr {
