@@ -86,7 +86,7 @@ fun TranslateScreen(
     ) {
         Text("离线翻译", style = MaterialTheme.typography.headlineMedium)
 
-        DirectionPad(from = from, to = to, onSwap = { vm.swap() })
+        DirectionPad(from = from, to = to, onSwap = { vm.swap() }, onFromSelect = vm::setFrom, onToSelect = vm::setTo)
 
         OutlinedTextField(
             value = source,
