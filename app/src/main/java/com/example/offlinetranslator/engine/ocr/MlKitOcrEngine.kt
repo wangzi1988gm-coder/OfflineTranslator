@@ -22,9 +22,9 @@ import kotlin.coroutines.resumeWithException
 /**
  * ML Kit OCR 引擎。
  *
- *  - 拉丁识别器（默认）：覆盖 en/ru/tg（俄语和塔吉克语都用西里尔字符；ML Kit 的 latin 模型对西里尔有基础支持）。
- *  - 中文识别器：覆盖 zh。
- *  - 自动检测脚本：中英文混排时合并两个识别器结果。
+ *  - 拉丁识别器：用于拉丁字母文本。
+ *  - 中文识别器：用于中文文本。
+ *  - 未提供语言提示时同时运行两个识别器，尽量覆盖中英混排；ML Kit 拉丁模型不保证识别俄语/塔吉克语西里尔文字。
  *
  * 注意：ML Kit 是本地推理，无需联网（除非用户主动下载语言包）。
  */
@@ -44,7 +44,7 @@ class MlKitOcrEngine(private val context: Context) : OcrEngine {
             val start = System.currentTimeMillis()
             val image = InputImage.fromBitmap(bitmap, 0)
 
-            val needChinese = hints.any { it.script == ScriptType.CJK } || detectNeedsChinese(bitmap)
+            val needChinese = hints.isEmpty() || hints.any { it.script == ScriptType.CJK } || detectNeedsChinese(bitmap)
             val needLatin = hints.isEmpty() ||
                 hints.any { it.script != ScriptType.CJK } ||
                 detectNeedsLatin(bitmap)
@@ -63,12 +63,17 @@ class MlKitOcrEngine(private val context: Context) : OcrEngine {
                 scripts += r.detectedScripts
             }
 
-            // 按行 y 坐标排序
-            lines.sortBy { it.boundingBox?.top ?: 0 }
-            val fullText = lines.joinToString("\n") { it.text }
+            // 按行 y 坐标排序，并去掉两个识别器在同一位置返回的重复文本。
+            val uniqueLines = lines
+                .distinctBy {
+                    val box = it.boundingBox
+                    "${it.text.trim()}|${box?.left ?: -1}|${box?.top ?: -1}|${box?.right ?: -1}|${box?.bottom ?: -1}"
+                }
+                .sortedBy { it.boundingBox?.top ?: 0 }
+            val fullText = uniqueLines.joinToString("\n") { it.text }
             OcrResult(
                 fullText = fullText,
-                lines = lines,
+                lines = uniqueLines,
                 engineId = engineId,
                 detectedScripts = scripts,
                 elapsedMillis = System.currentTimeMillis() - start,
