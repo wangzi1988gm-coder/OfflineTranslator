@@ -117,14 +117,8 @@ adb shell run-as com.example.offlinetranslator ls -la files/models/
 
 ## 9. CI / 自动化
 
-`build.gradle.kts` 未配置 CI。可加：
-```yaml
-# .github/workflows/build.yml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:assembleDebug
-```
+仓库已配置 `.github/workflows/build.yml`：
+- 推送到 `main` / `master` 或创建 Pull Request 时，运行单元测试并构建 Debug APK。
+- 在 GitHub Actions 页面打开 **Build Android APK**，从 Artifacts 下载构建产物。
+- 若构建失败，工作流会尝试上传 `OfflineTranslator-build-log`，便于定位 Kotlin、Gradle 或依赖解析错误。
+- 手动运行工作流时可选择 `debug` 或 `release-unsigned`。Release 产物未签名，不能当作正式发布包使用。
