@@ -63,7 +63,10 @@ jobs:
 
       - name: Run unit tests and build Debug APK
         if: github.event_name != 'workflow_dispatch' || inputs.build_type == 'debug'
-        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
 
       - name: Build unsigned Release APK
         if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'release-unsigned'
