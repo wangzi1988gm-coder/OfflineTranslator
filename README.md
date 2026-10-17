@@ -1,11 +1,11 @@
-# 离线翻译助手（Honor 500 Pro 专用）
+# 离线通译 1.0.0-dev（Honor 500 Pro 专用）
 
 > 一款完全离线的中 ⇄ 英、中 ⇄ 俄、中 ⇄ 塔吉克翻译应用，覆盖文本翻译、语音对讲、图片翻译。
 > 目标设备：荣耀 500 Pro（MEP-AN00，Android 16 / MagicOS 10，12GB RAM + 512GB ROM）。
 
 ## ⚡ 看到 APK 之前你需要知道的事
 
-**项目交付物是完整源码工程，不是可直接安装的 APK。** 当前工作机没有 Android SDK / JDK / Android Studio，所以无法在这里直接生成 APK。
+**项目交付物是完整源码工程，不是可直接安装的 APK。** 本仓库已配置 GitHub Actions 自动构建。每次推送代码后会尝试编译 Debug APK；构建成功后，在仓库的 Actions → Build Android APK → Artifacts 下载。当前源码仍需通过 CI 实际编译验证。
 
 **推荐路径：在你自己电脑上装 Android Studio 一键运行** 📖 **[完整 Studio 安装步骤 → docs/INSTALL_STUDIO.md](docs/INSTALL_STUDIO.md)**
 
@@ -122,7 +122,7 @@ OfflineTranslatorAndroid_source/
 
 ```bash
 cd OfflineTranslatorAndroid_source
-./gradlew :app:assembleDebug
+gradle :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
