@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.offlinetranslator.data.Language
+import com.example.offlinetranslator.data.LanguagePair
 import com.example.offlinetranslator.engine.asr.AsrRouter
 import com.example.offlinetranslator.engine.asr.AudioRecorder
 import com.example.offlinetranslator.engine.asr.StreamingAsr
@@ -72,8 +73,15 @@ class ConversationViewModel(
     private var levelJob: Job? = null
     private var pcmBuffer = ArrayList<Float>(16_000 * 4) // 4 秒缓冲
 
-    fun setLangA(lang: Language) { _langA.value = lang }
-    fun setLangB(lang: Language) { _langB.value = lang }
+    fun setLangA(lang: Language) {
+        _langA.value = lang
+        if (!LanguagePair.isSupported(lang, _langB.value)) {
+            _langB.value = if (lang == Language.ZH) Language.EN else Language.ZH
+        }
+    }
+    fun setLangB(lang: Language) {
+        if (LanguagePair.isSupported(_langA.value, lang)) _langB.value = lang
+    }
     fun swap() {
         val a = _langA.value
         _langA.value = _langB.value
