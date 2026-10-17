@@ -95,16 +95,17 @@ class ModelManager(
         )
 
         fun candidate(dir: File, category: ModelCategory): Candidate? {
-            // The engines currently expect these files directly inside the model directory.
-            // Do not advertise a model as ready when its runtime cannot load its layout.
-            val files = dir.listFiles()?.filter { it.isFile }.orEmpty()
+            // Support Hugging Face Optimum/Transformers.js exports with ONNX files in onnx/.
+            // Keep nested paths in place; the runtime resolves either layout.
+            val files = (dir.listFiles()?.filter { it.isFile }.orEmpty() +
+                File(dir, "onnx").listFiles()?.filter { it.isFile }.orEmpty())
             fun file(name: String) = files.firstOrNull { it.name.equals(name, ignoreCase = true) }
             val tokens = file("tokens.txt")
 
             return when (category) {
                 ModelCategory.TRANSLATOR -> {
                     val encoder = file("encoder.onnx") ?: file("encoder_model.onnx")
-                    val decoder = file("decoder.onnx") ?: file("decoder_model.onnx") ?: file("decoder_with_lm_head.onnx")
+                    val decoder = file("decoder.onnx") ?: file("decoder_model.onnx") ?: file("decoder_with_lm_head.onnx") ?: file("decoder_model_merged.onnx") ?: file("decoder_model_merged_int8.onnx")
                     val tokenizerSrc = file("source.spm") ?: file("vocab.src")
                     val tokenizerTgt = file("target.spm") ?: file("vocab.tgt")
                     if (encoder == null || decoder == null || tokenizerSrc == null || tokenizerTgt == null) null
@@ -226,10 +227,11 @@ class ModelManager(
         // translator/<key>：只有文件结构满足 Marian 引擎要求时才显示为已安装。
         File(storage.modelsRoot, "translator").listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
-            val files = dir.listFiles()?.filter { it.isFile }.orEmpty()
+            val files = (dir.listFiles()?.filter { it.isFile }.orEmpty() +
+                File(dir, "onnx").listFiles()?.filter { it.isFile }.orEmpty())
             fun has(vararg names: String) = names.any { wanted -> files.any { it.name.equals(wanted, true) } }
-            val encoder = files.firstOrNull { it.name.equals("encoder.onnx", true) || it.name.equals("encoder_model.onnx", true) }
-            val decoderReady = has("decoder.onnx", "decoder_model.onnx", "decoder_with_lm_head.onnx")
+            val encoder = files.firstOrNull { it.name.equals("encoder.onnx", true) || it.name.equals("encoder_model.onnx", true) || it.name.equals("encoder_model_int8.onnx", true) }
+            val decoderReady = has("decoder.onnx", "decoder_model.onnx", "decoder_with_lm_head.onnx", "decoder_model_merged.onnx", "decoder_model_merged_int8.onnx")
             val tokenizerReady = has("source.spm", "vocab.src") && has("target.spm", "vocab.tgt")
             if (encoder != null && decoderReady && tokenizerReady) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
