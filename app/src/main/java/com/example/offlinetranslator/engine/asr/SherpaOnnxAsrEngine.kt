@@ -55,35 +55,36 @@ class SherpaOnnxAsrEngine(
             val encoder = File(root, "encoder.onnx").takeIf { it.exists() }
             val decoder = File(root, "decoder.onnx").takeIf { it.exists() }
             val joiner = File(root, "joiner.onnx").takeIf { it.exists() }
-            val singleModel = File(root, "model.onnx").takeIf { it.exists() }
-
-            val featureConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80)
-
-            val recognizer: OnlineRecognizer = when {
-                encoder != null && decoder != null && joiner != null -> {
-                    val modelConfig = OnlineTransducerModelConfig(
-                        encoder = encoder.absolutePath,
-                        decoder = decoder.absolutePath,
-                        joiner = joiner.absolutePath,
-                    )
-                    OnlineRecognizer.fromTransducer(
-                        modelConfig,
-                        tokensFile.absolutePath,
-                        4,
-                    )
-                }
-                singleModel != null -> {
-                    OnlineRecognizer.fromParaformer(
-                        singleModel.absolutePath,
-                        tokensFile.absolutePath,
-                        4,
-                    )
-                }
-                else -> {
-                    Log.e(TAG, "未识别出 sherpa-onnx 模型类型（需 encoder+decoder+joiner 或 model.onnx）")
-                    return false
-                }
+            val isTransducer = encoder != null && decoder != null && joiner != null
+            val isParaformer = encoder != null && decoder != null && joiner == null
+            if (!isTransducer && !isParaformer) {
+                Log.e(TAG, "未识别出支持的在线 sherpa-onnx 模型（Transducer 或 Paraformer encoder/decoder）")
+                return false
             }
+
+            val modelConfig = OnlineModelConfig(
+                transducer = if (isTransducer) {
+                    OnlineTransducerModelConfig(
+                        encoder = encoder!!.absolutePath,
+                        decoder = decoder!!.absolutePath,
+                        joiner = joiner!!.absolutePath,
+                    )
+                } else OnlineTransducerModelConfig(),
+                paraformer = if (isParaformer) {
+                    OnlineParaformerModelConfig(
+                        encoder = encoder!!.absolutePath,
+                        decoder = decoder!!.absolutePath,
+                    )
+                } else OnlineParaformerModelConfig(),
+                tokens = tokensFile.absolutePath,
+                numThreads = 4,
+                modelType = if (isTransducer) "transducer" else "paraformer",
+            )
+            val recognizerConfig = OnlineRecognizerConfig(
+                featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
+                modelConfig = modelConfig,
+            )
+            val recognizer = OnlineRecognizer(config = recognizerConfig)
 
             recognizers[language]?.release()
             recognizers[language] = recognizer
