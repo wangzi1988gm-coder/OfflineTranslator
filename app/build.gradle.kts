@@ -123,7 +123,7 @@ dependencies {
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
 
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
-    implementation("com.github.k2-fsa:sherpa-onnx:v1.10.20")
+    implementation("com.github.k2-fsa:sherpa-onnx:1.13.8")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     testImplementation("junit:junit:4.13.2")
