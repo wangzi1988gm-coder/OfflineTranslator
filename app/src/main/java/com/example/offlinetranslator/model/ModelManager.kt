@@ -174,10 +174,17 @@ class ModelManager(
                 ModelCategory.OCR -> error("OCR models are bundled with the app")
             }
             val destination = File(storage.modelsRoot, relativeRoot)
-            destination.deleteRecursively()
-            destination.parentFile?.mkdirs()
-            item.directory.copyRecursively(destination, overwrite = true)
-            val size = destination.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            val sourcePath = item.directory.canonicalFile
+            val destinationPath = destination.canonicalFile
+            // The user may select the app's own models directory in the import picker.
+            // Never delete or recursively copy a directory onto itself.
+            if (sourcePath != destinationPath) {
+                destination.deleteRecursively()
+                destination.parentFile?.mkdirs()
+                item.directory.copyRecursively(destination, overwrite = true)
+            }
+            val installedDir = if (sourcePath == destinationPath) item.directory else destination
+            val size = installedDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
             ModelPack(
                 slotKey = item.slotKey,
                 category = item.category,
@@ -228,9 +235,11 @@ class ModelManager(
         File(storage.modelsRoot, "asr").listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
             val tokens = dir.walkTopDown().firstOrNull {
-                it.isFile && (it.name.endsWith(".onnx") || it.name == "tokens.txt")
+                it.isFile && it.name.equals("tokens.txt", ignoreCase = true)
             }
-            if (tokens != null) {
+            if (tokens != null && dir.walkTopDown().any {
+                    it.isFile && it.extension.equals("onnx", ignoreCase = true)
+                }) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 out += ModelPack(
                     slotKey = "asr-${dir.name}",
