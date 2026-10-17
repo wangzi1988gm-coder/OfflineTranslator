@@ -112,7 +112,7 @@ class MarianMtEngine(
         }
     }
 
-    override fun unload() {
+    fun unload() {
         runCatching { session?.close() }
         runCatching { decoderSession?.close() }
         session = null
@@ -143,7 +143,7 @@ class MarianMtEngine(
             )
 
             // Encoder 前向：input_ids + attention_mask
-            val encInputs = HashMap<String, OnnxTensor<*>>()
+            val encInputs = HashMap<String, OnnxTensor>()
             encInputs["input_ids"] = srcTensor
             encInputs["attention_mask"] = srcMaskTensor
             val encOut = session!!.run(encInputs)
@@ -162,7 +162,7 @@ class MarianMtEngine(
                 val tgtTensor = OnnxTensor.createTensor(
                     decEnv, LongBuffer.wrap(tgtArr), longArrayOf(1, tgtArr.size.toLong())
                 )
-                val inputs = HashMap<String, OnnxTensor<*>>()
+                val inputs = HashMap<String, OnnxTensor>()
                 inputs["input_ids"] = tgtTensor
                 inputs["encoder_hidden_states"] = hiddenTensor
                 inputs["encoder_attention_mask"] = srcMaskTensor
