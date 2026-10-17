@@ -183,35 +183,59 @@ class SentencePieceLite {
      *  - 子词切分采用"最大公共前缀"启发式（仅适用于字典化 OPUS-MT vocab）。
      */
     fun encode(text: String, maxLength: Int = 256): IntArray {
-        val out = ArrayList<Int>(text.length / 2 + 4)
-        // SentencePiece normalizes the beginning of a sentence to the ▁ marker.
+        require(maxLength >= 2) { "maxLength 至少为 2" }
         val normalized = SPACE_MARKER + text.trim().replace(' ', SPACE_MARKER_CHAR)
-        var i = 0
-        while (i < normalized.length) {
-            var matched = -1
-            var matchedLen = 0
-            // 从当前位置开始尝试匹配最长 piece
-            val maxTry = minOf(normalized.length - i, 20) // SPM 子词通常 < 20 字符
-            for (len in maxTry downTo 1) {
-                val sub = normalized.substring(i, i + len)
-                val id = pieceToId[sub]
-                if (id != null && id >= 0) {
-                    matched = id
-                    matchedLen = len
-                    break
+        if (normalized.isEmpty()) return intArrayOf(idOrUnk(EOS_TOKEN))
+
+        // Viterbi segmentation: choose the highest-scoring complete piece sequence,
+        // rather than greedily taking the longest prefix (which can produce invalid token IDs).
+        val n = normalized.length
+        val bestScore = FloatArray(n + 1) { Float.NEGATIVE_INFINITY }
+        val nextPosition = IntArray(n + 1) { -1 }
+        val nextPiece = IntArray(n + 1) { idOrUnk(UNK_TOKEN) }
+        bestScore[n] = 0f
+        val maxPieceLength = 64
+
+        for (i in n - 1 downTo 0) {
+            val limit = minOf(maxPieceLength, n - i)
+            for (length in 1..limit) {
+                val j = i + length
+                val id = pieceToId[normalized.substring(i, j)] ?: continue
+                if (id < 0 || id >= scores.size || bestScore[j].isInfinite() && j != n) continue
+                val candidate = scores[id] + bestScore[j]
+                if (candidate > bestScore[i]) {
+                    bestScore[i] = candidate
+                    nextPosition[i] = j
+                    nextPiece[i] = id
                 }
             }
-            if (matched < 0) {
-                matched = idOrUnk(UNK_TOKEN)
-                matchedLen = 1
+
+            // Unknown fallback advances one UTF-16 code unit; normal Chinese/Russian/English
+            // characters are covered, and the guard prevents a dead-end path for unseen symbols.
+            if (nextPosition[i] < 0) {
+                nextPosition[i] = i + 1
+                nextPiece[i] = idOrUnk(UNK_TOKEN)
+                bestScore[i] = -100f + bestScore[i + 1].takeIf { it.isFinite() } .orZero()
             }
-            out += matched
-            i += matchedLen
-            if (out.size >= maxLength - 1) break
+        }
+
+        val out = ArrayList<Int>(minOf(maxLength, n + 1))
+        var position = 0
+        while (position < n && out.size < maxLength - 1) {
+            val next = nextPosition[position]
+            if (next <= position || next > n) {
+                out += idOrUnk(UNK_TOKEN)
+                position++
+            } else {
+                out += nextPiece[position]
+                position = next
+            }
         }
         out += idOrUnk(EOS_TOKEN)
         return out.toIntArray()
     }
+
+    private fun Float.orZero(): Float = if (isFinite()) this else 0f
 
     /**
      * 解码：把 piece id 合并成字符串。
