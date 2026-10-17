@@ -4,6 +4,8 @@
 
 ## 1. 环境
 
+> 本仓库当前通过 GitHub Actions 使用 Gradle 8.10.2 构建；本地命令行构建需先安装 Gradle 8.10.2。
+
 | 组件 | 版本 | 备注 |
 | --- | --- | --- |
 | JDK | 17 | Android Studio 自带 |
@@ -16,8 +18,8 @@
 
 ```bash
 git clone <repo>
-cd OfflineTranslatorAndroid_source
-./gradlew :app:assembleDebug
+cd OfflineTranslator
+gradle :app:assembleDebug
 ```
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`
