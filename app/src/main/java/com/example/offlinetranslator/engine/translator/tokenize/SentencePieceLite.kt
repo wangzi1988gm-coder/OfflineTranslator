@@ -213,9 +213,14 @@ class SentencePieceLite {
             // Unknown fallback advances one UTF-16 code unit; normal Chinese/Russian/English
             // characters are covered, and the guard prevents a dead-end path for unseen symbols.
             if (nextPosition[i] < 0) {
-                nextPosition[i] = i + 1
+                val unknownLength = if (
+                    Character.isHighSurrogate(normalized[i]) &&
+                    i + 1 < n &&
+                    Character.isLowSurrogate(normalized[i + 1])
+                ) 2 else 1
+                nextPosition[i] = minOf(n, i + unknownLength)
                 nextPiece[i] = idOrUnk(UNK_TOKEN)
-                bestScore[i] = -100f + (bestScore[i + 1].takeIf { it.isFinite() } ?: 0f)
+                bestScore[i] = -100f + (bestScore[nextPosition[i]].takeIf { it.isFinite() } ?: 0f)
             }
         }
 
