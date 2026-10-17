@@ -146,9 +146,17 @@ fun ImageTranslateScreen(vm: ImageTranslateViewModel) {
             )
         }
 
-        DirectionPad(from = from, to = to, onSwap = {
-            val a = from; vm.setFrom(to); vm.setTo(a)
-        })
+        DirectionPad(
+            from = from,
+            to = to,
+            onSwap = {
+                val a = from
+                vm.setFrom(to)
+                vm.setTo(a)
+            },
+            onFromSelect = vm::setFrom,
+            onToSelect = vm::setTo,
+        )
 
         // 图片预览
         Card(
