@@ -55,7 +55,7 @@ class MlKitOcrEngine(private val context: Context) : OcrEngine {
             if (needLatin) {
                 val r = runRecognizer(latinClient, image)
                 lines += r.lines.map { it.copy(script = detectScript(it.text)) }
-                scripts += r.scripts
+                scripts += r.detectedScripts
             }
             if (needChinese) {
                 val r = runRecognizer(chineseClient, image)
@@ -110,7 +110,14 @@ class MlKitOcrEngine(private val context: Context) : OcrEngine {
                         }
                     }
                     val scripts = lines.map { detectScript(it.text) }.toSet()
-                    cont.resume(OcrResult(lines.joinToString("\n") { it.text }, lines, scripts))
+                    cont.resume(
+                        OcrResult(
+                            fullText = lines.joinToString("\n") { it.text },
+                            lines = lines,
+                            engineId = engineId,
+                            detectedScripts = scripts,
+                        )
+                    )
                 }
                 .addOnFailureListener { e -> cont.resumeWithException(e) }
         }
