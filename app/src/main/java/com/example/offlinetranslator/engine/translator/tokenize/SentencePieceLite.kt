@@ -62,6 +62,8 @@ class SentencePieceLite {
         const val PAD_TOKEN = "<pad>"
         const val UNK_TOKEN = "<unk>"
         const val SEP_TOKEN = "</s>"
+        private const val SPACE_MARKER_CHAR = '\u2581'
+        private const val SPACE_MARKER = "\u2581"
 
         fun parseVocabLines(lines: List<String>): List<Pair<String, Float>> =
             lines.mapNotNull { line ->
@@ -165,9 +167,4 @@ class SentencePieceLite {
 
     fun vocabSize(): Int = pieces.size
 
-    private companion object {
-        /** SPM 中 "▁" (U+2581) 习惯上作为词首空格标记 */
-        const val SPACE_MARKER_CHAR = '\u2581'
-        const val SPACE_MARKER = "\u2581"
-    }
 }
