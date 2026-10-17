@@ -52,9 +52,16 @@ jobs:
           gradle --version
           sdkmanager --list_installed
 
-      - name: Build Debug APK
+      - name: Verify strict offline manifest
+        run: |
+          if grep -Eq 'uses-permission[^>]+android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
+            echo "Unexpected INTERNET permission in the offline app manifest."
+            exit 1
+          fi
+
+      - name: Run unit tests and build Debug APK
         if: github.event_name != 'workflow_dispatch' || inputs.build_type == 'debug'
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
 
       - name: Build unsigned Release APK
         if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'release-unsigned'
