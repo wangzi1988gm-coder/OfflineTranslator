@@ -73,11 +73,17 @@ class ModelManager(
 
     /** 删除某个 pack 对应的文件目录 */
     suspend fun deletePack(pack: ModelPack) = withContext(Dispatchers.IO) {
-        val dir = File(storage.modelsRoot, pack.rootDir).let {
-            // rootDir 可能包含子目录，尝试删除其父目录
-            if (it.exists()) it else File(storage.modelsRoot, pack.rootDir.substringBeforeLast('/'))
+        // Never fall back to deleting the parent category directory: a stale manifest
+        // entry must not remove every model in translator/, asr/, or tts/.
+        val modelsRoot = storage.modelsRoot.canonicalFile
+        val dir = File(modelsRoot, pack.rootDir).canonicalFile
+        val rootPrefix = modelsRoot.absolutePath.trimEnd(File.separatorChar) + File.separator
+        require(dir.absolutePath.startsWith(rootPrefix)) { "拒绝删除模型目录之外的路径" }
+        require(dir != modelsRoot) { "拒绝删除模型根目录" }
+        if (dir.exists()) {
+            require(dir.isDirectory) { "模型路径不是目录" }
+            dir.deleteRecursively()
         }
-        dir.deleteRecursively()
         _packs.value = _packs.value.filterNot { it.slotKey == pack.slotKey && it.engineImpl == pack.engineImpl }
         manifest.save(_packs.value)
     }
