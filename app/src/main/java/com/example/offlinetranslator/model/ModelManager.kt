@@ -104,7 +104,7 @@ class ModelManager(
 
             return when (category) {
                 ModelCategory.TRANSLATOR -> {
-                    val encoder = file("encoder.onnx") ?: file("encoder_model.onnx")
+                    val encoder = file("encoder.onnx") ?: file("encoder_model.onnx") ?: file("encoder_model_int8.onnx")
                     val decoder = file("decoder.onnx") ?: file("decoder_model.onnx") ?: file("decoder_with_lm_head.onnx") ?: file("decoder_model_merged.onnx") ?: file("decoder_model_merged_int8.onnx")
                     val tokenizerSrc = file("source.spm") ?: file("vocab.src")
                     val tokenizerTgt = file("target.spm") ?: file("vocab.tgt")
