@@ -48,7 +48,7 @@ class TtsRouter(
         return when (preference) {
             TtsEnginePref.OFFLINE_VITS_ONLY -> {
                 if (offline.isReady(language)) offline.speak(text, language, rate, pitch)
-                else system.speak(text, language, rate, pitch).copy(warning = "无离线 VITS 模型，使用系统 TTS 兜底")
+                else TtsResult(false, "SHERPA_ONNX_VITS", language, warning = "未加载离线 VITS 模型，请先导入对应语言的 TTS 模型")
             }
             TtsEnginePref.SYSTEM_PREFERRED -> {
                 if (system.isReady(language)) system.speak(text, language, rate, pitch)
