@@ -202,8 +202,16 @@ class MarianMtEngine(
                 generated += decoderStartId
                 var nextInputId = decoderStartId
                 for (step in 0 until maxLength - 1) {
+                    // Cached merged decoders consume only the newest token after the first pass.
+                    // A plain decoder without KV cache must receive the complete generated prefix.
+                    val decoderIds = if (mergedDecoder && step > 0) {
+                        longArrayOf(nextInputId.toLong())
+                    } else {
+                        generated.map { it.toLong() }.toLongArray()
+                    }
                     val inputIds = OnnxTensor.createTensor(
-                        env, LongBuffer.wrap(longArrayOf(nextInputId.toLong())), longArrayOf(1, 1)
+                        env, LongBuffer.wrap(decoderIds),
+                        longArrayOf(1, decoderIds.size.toLong())
                     )
                     val branchTensor = if (mergedDecoder) {
                         OnnxTensor.createTensor(env, booleanArrayOf(step > 0))
