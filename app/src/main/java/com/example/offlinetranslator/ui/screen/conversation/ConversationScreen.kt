@@ -92,7 +92,7 @@ fun ConversationScreen(vm: ConversationViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        DirectionPad(from = langA, to = langB, onSwap = { vm.swap() })
+        DirectionPad(from = langA, to = langB, onSwap = { vm.swap() }, onFromSelect = vm::setLangA, onToSelect = vm::setLangB)
 
         // 当前说话方卡片
         Surface(
