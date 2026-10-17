@@ -215,7 +215,7 @@ class SentencePieceLite {
             if (nextPosition[i] < 0) {
                 nextPosition[i] = i + 1
                 nextPiece[i] = idOrUnk(UNK_TOKEN)
-                bestScore[i] = -100f + bestScore[i + 1].takeIf { it.isFinite() } .orZero()
+                bestScore[i] = -100f + (bestScore[i + 1].takeIf { it.isFinite() } ?: 0f)
             }
         }
 
@@ -235,7 +235,6 @@ class SentencePieceLite {
         return out.toIntArray()
     }
 
-    private fun Float.orZero(): Float = if (isFinite()) this else 0f
 
     /**
      * 解码：把 piece id 合并成字符串。
