@@ -115,7 +115,11 @@ data class LanguagePair(val from: Language, val to: Language) {
 
         fun isSupported(from: Language, to: Language): Boolean {
             if (from == to) return false
-            return ALL.any { it.from == from && it.to == to }
+            // Keep this independent of ALL: LanguagePair init validates entries while ALL is being built.
+            return when (from) {
+                Language.ZH -> to == Language.EN || to == Language.RU || to == Language.TG
+                Language.EN, Language.RU, Language.TG -> to == Language.ZH
+            }
         }
 
         fun of(from: Language, to: Language): LanguagePair? =
