@@ -95,26 +95,37 @@ class ModelManager(
         )
 
         fun candidate(dir: File, category: ModelCategory): Candidate? {
-            val files = dir.walkTopDown().filter { it.isFile }.toList()
-            val onnx = files.firstOrNull { it.extension.equals("onnx", ignoreCase = true) }
-            val modelFile = onnx ?: files.firstOrNull { it.extension.equals("bin", ignoreCase = true) }
-            val tokens = files.firstOrNull { it.name.equals("tokens.txt", ignoreCase = true) }
+            // The engines currently expect these files directly inside the model directory.
+            // Do not advertise a model as ready when its runtime cannot load its layout.
+            val files = dir.listFiles()?.filter { it.isFile }.orEmpty()
+            fun file(name: String) = files.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            val onnxFiles = files.filter { it.extension.equals("onnx", ignoreCase = true) }
+            val tokens = file("tokens.txt")
 
             return when (category) {
                 ModelCategory.TRANSLATOR -> {
-                    if (onnx == null) null else Candidate(
+                    val encoder = file("encoder.onnx")
+                    val decoder = file("decoder.onnx") ?: file("decoder_with_lm_head.onnx")
+                    val tokenizerSrc = file("source.spm") ?: file("vocab.src")
+                    val tokenizerTgt = file("target.spm") ?: file("vocab.tgt")
+                    if (encoder == null || decoder == null || tokenizerSrc == null || tokenizerTgt == null) null
+                    else Candidate(
                         category, dir, dir.name,
                         if (dir.name.lowercase().startsWith("nllb")) "NLLB_200" else "MARIAN_MT",
-                        onnx.name,
+                        encoder.name,
                     )
                 }
                 ModelCategory.ASR -> {
-                    if (onnx == null || tokens == null) null else Candidate(
+                    val transducer = file("encoder.onnx") != null &&
+                        file("decoder.onnx") != null && file("joiner.onnx") != null
+                    val paraformer = file("model.onnx") != null
+                    if (tokens == null || (!transducer && !paraformer)) null else Candidate(
                         category, dir, "asr-${dir.name.removePrefix("asr-")}", "SHERPA_ONNX", tokens.name,
                     )
                 }
                 ModelCategory.TTS -> {
-                    if (modelFile == null) null else Candidate(
+                    val modelFile = file("model.onnx")
+                    if (modelFile == null || tokens == null) null else Candidate(
                         category, dir, "tts-${dir.name.removePrefix("tts-")}", "SHERPA_ONNX_VITS", modelFile.name,
                     )
                 }
@@ -234,12 +245,12 @@ class ModelManager(
         // asr/<lang>/* sherpa 模型
         File(storage.modelsRoot, "asr").listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
-            val tokens = dir.walkTopDown().firstOrNull {
-                it.isFile && it.name.equals("tokens.txt", ignoreCase = true)
+            val tokens = File(dir, "tokens.txt").takeIf { it.isFile }
+            val transducer = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx").all {
+                File(dir, it).isFile
             }
-            if (tokens != null && dir.walkTopDown().any {
-                    it.isFile && it.extension.equals("onnx", ignoreCase = true)
-                }) {
+            val paraformer = File(dir, "model.onnx").isFile
+            if (tokens != null && (transducer || paraformer)) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 out += ModelPack(
                     slotKey = "asr-${dir.name}",
@@ -256,10 +267,8 @@ class ModelManager(
         // tts/<lang>/* VITS
         File(storage.modelsRoot, "tts").listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
-            val modelFile = dir.walkTopDown().firstOrNull {
-                it.isFile && (it.name.endsWith(".onnx") || it.name.endsWith(".bin"))
-            }
-            if (modelFile != null) {
+            val modelFile = File(dir, "model.onnx").takeIf { it.isFile }
+            if (modelFile != null && File(dir, "tokens.txt").isFile) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 out += ModelPack(
                     slotKey = "tts-${dir.name}",
