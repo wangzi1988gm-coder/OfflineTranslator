@@ -60,18 +60,24 @@ class MarianMtEngine(
         return try {
             unload()
             val root = File(storage.modelsRoot, pack.rootDir)
-            val encoder = File(root, "encoder.onnx").takeIf { it.isFile }
-                ?: File(root, "encoder_model.onnx")
-            val decoder = File(root, "decoder.onnx").takeIf { it.isFile }
-                ?: File(root, "decoder_model.onnx")
+            val onnxRoot = File(root, "onnx").takeIf { it.isDirectory } ?: root
+            val encoder = listOf(
+                File(root, "encoder.onnx"), File(root, "encoder_model.onnx"),
+                File(onnxRoot, "encoder_model_int8.onnx"), File(onnxRoot, "encoder_model.onnx"),
+            ).firstOrNull { it.isFile } ?: File(root, "encoder_model.onnx")
+            val decoder = listOf(
+                File(root, "decoder.onnx"), File(root, "decoder_model.onnx"),
+                File(onnxRoot, "decoder_model_merged_int8.onnx"), File(onnxRoot, "decoder_model_merged.onnx"),
+                File(onnxRoot, "decoder_model.onnx"),
+            ).firstOrNull { it.isFile } ?: File(root, "decoder_model.onnx")
             val decoderLm = File(root, "decoder_with_lm_head.onnx")
             val srcSpmFile = File(root, "source.spm")
             val tgtSpmFile = File(root, "target.spm")
             val vocabSrc = File(root, "vocab.src")
             val vocabTgt = File(root, "vocab.tgt")
 
-            require(encoder.isFile) { "缺少 encoder.onnx / encoder_model.onnx" }
-            require(decoder.isFile || decoderLm.isFile) { "缺少 decoder*.onnx" }
+            require(encoder.isFile) { "缺少 encoder.onnx / encoder_model.onnx（也检查了 onnx/ 子目录）" }
+            require(decoder.isFile || decoderLm.isFile) { "缺少 decoder*.onnx（也检查了 onnx/ 子目录）" }
 
             // OPUS-MT Marian exports usually use PAD (65000) as decoder start and EOS (0).
             val configText = File(root, "config.json").takeIf { it.isFile }?.readText().orEmpty()
@@ -115,7 +121,7 @@ class MarianMtEngine(
             require(srcSpm != null && tgtSpm != null) { "缺少 SPM / vocab 文件" }
             eosId = Regex("\\\"eos_token_id\\\"\\s*:\\s*(\\d+)")
                 .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                ?: tgtSpm!!.idOrUnk(SentencePieceLite.EOS_TOKEN)
+                ?: 0
 
             slotKey = pack.slotKey
             loaded = true
@@ -144,66 +150,130 @@ class MarianMtEngine(
             if (!loaded || session == null || decoderSession == null) {
                 throw EngineNotReadyException("MarianMt 未加载。$slotKey")
             }
+
+            val env = OrtEnvironment.getEnvironment()
             val srcIds = srcSpm!!.encode(text, maxLength)
             val srcTensor = OnnxTensor.createTensor(
-                OrtEnvironment.getEnvironment(),
-                LongBuffer.wrap(srcIds.map { it.toLong() }.toLongArray()),
+                env, LongBuffer.wrap(srcIds.map { it.toLong() }.toLongArray()),
                 longArrayOf(1, srcIds.size.toLong()),
             )
-            val srcMask = LongArray(srcIds.size) { 1L }
             val srcMaskTensor = OnnxTensor.createTensor(
-                OrtEnvironment.getEnvironment(),
-                LongBuffer.wrap(srcMask),
+                env, LongBuffer.wrap(LongArray(srcIds.size) { 1L }),
                 longArrayOf(1, srcIds.size.toLong()),
             )
-
-            // Encoder 前向：input_ids + attention_mask
-            val encInputs = HashMap<String, OnnxTensor>()
-            encInputs["input_ids"] = srcTensor
-            encInputs["attention_mask"] = srcMaskTensor
-            val encOut = session!!.run(encInputs)
-            val hiddenStates = encOut[0].value as Array<Array<FloatArray>>  // [1, seq, hidden]
-
-            // 自回归生成（简化版：每步构造 decoder 输入）
-            val tgtIds = ArrayList<Int>(maxLength)
-            tgtIds += tgtSpm!!.idOrUnk(SentencePieceLite.BOS_TOKEN)
-            val eosId = tgtSpm!!.idOrUnk(SentencePieceLite.EOS_TOKEN)
-
-            val decEnv = OrtEnvironment.getEnvironment()
-            val hiddenTensor = OnnxTensor.createTensor(decEnv, hiddenStates)
-            var lastTokens: IntArray = tgtIds.toIntArray()
-            for (step in 0 until maxLength - 1) {
-                val tgtArr = LongArray(lastTokens.size) { lastTokens[it].toLong() }
-                val tgtTensor = OnnxTensor.createTensor(
-                    decEnv, LongBuffer.wrap(tgtArr), longArrayOf(1, tgtArr.size.toLong())
+            var encOut: OrtSession.Result? = null
+            var hiddenTensor: OnnxTensor? = null
+            var previousResult: OrtSession.Result? = null
+            val emptyCaches = mutableListOf<OnnxTensor>()
+            try {
+                val encInputs = hashMapOf(
+                    "input_ids" to srcTensor,
+                    "attention_mask" to srcMaskTensor,
                 )
-                val inputs = HashMap<String, OnnxTensor>()
-                inputs["input_ids"] = tgtTensor
-                inputs["encoder_hidden_states"] = hiddenTensor
-                inputs["encoder_attention_mask"] = srcMaskTensor
-                val logitsOut = decoderSession!!.run(inputs)
-                val logits = logitsOut[0].value as Array<Array<FloatArray>>
-                val lastStep = logits[0][logits[0].size - 1]
-                val nextId = argmax(lastStep)
-                runCatching { logitsOut.close() }
-                runCatching { tgtTensor.close() }
-                if (nextId == eosId) break
-                tgtIds += nextId
-                lastTokens = tgtIds.toIntArray()
+                encOut = session!!.run(encInputs)
+                val hiddenStates = encOut[0].value as Array<Array<FloatArray>>
+                hiddenTensor = OnnxTensor.createTensor(env, hiddenStates)
+
+                val decoder = decoderSession!!
+                val inputNames = decoder.inputInfo.keys
+                val outputNames = decoder.outputInfo.keys
+                val cacheInputNames = inputNames.filter { it.startsWith("past_key_values.") }
+                val mergedDecoder = inputNames.contains("use_cache_branch")
+
+                // The merged Optimum decoder requires empty past-key-value tensors on its first pass.
+                if (mergedDecoder) {
+                    for (name in cacheInputNames) {
+                        val info = decoder.inputInfo[name]?.info as? ai.onnxruntime.TensorInfo
+                            ?: continue
+                        val shape = info.shape.copyOf()
+                        for (i in shape.indices) if (shape[i] < 0) shape[i] = 1L
+                        if (shape.isNotEmpty()) shape[shape.lastIndex - 1] = 0L
+                        val count = shape.fold(1L) { acc, dim -> acc * dim }.coerceAtLeast(0L)
+                        val tensor = OnnxTensor.createTensor(
+                            env, java.nio.FloatBuffer.wrap(FloatArray(count.toInt())), shape
+                        )
+                        emptyCaches += tensor
+                    }
+                }
+
+                val generated = ArrayList<Int>(maxLength)
+                generated += decoderStartId
+                var nextInputId = decoderStartId
+                for (step in 0 until maxLength - 1) {
+                    val inputIds = OnnxTensor.createTensor(
+                        env, LongBuffer.wrap(longArrayOf(nextInputId.toLong())), longArrayOf(1, 1)
+                    )
+                    val branchTensor = if (mergedDecoder) {
+                        OnnxTensor.createTensor(env, booleanArrayOf(step > 0))
+                    } else null
+                    val inputs = HashMap<String, OnnxTensor>()
+                    inputs["input_ids"] = inputIds
+                    inputs["encoder_hidden_states"] = hiddenTensor!!
+                    inputs["encoder_attention_mask"] = srcMaskTensor
+
+                    if (mergedDecoder) {
+                        inputs["use_cache_branch"] = branchTensor!!
+                        if (step == 0) {
+                            cacheInputNames.forEachIndexed { index, name ->
+                                if (index < emptyCaches.size) inputs[name] = emptyCaches[index]
+                            }
+                        } else {
+                            val prior = previousResult
+                                ?: throw IllegalStateException("解码器 KV cache 丢失")
+                            cacheInputNames.forEach { name ->
+                                val outputName = "present." + name.removePrefix("past_key_values.")
+                                val actualName = when {
+                                    outputNames.contains(outputName) -> outputName
+                                    outputNames.contains(name.replace("past_key_values.", "present.")) ->
+                                        name.replace("past_key_values.", "present.")
+                                    else -> throw IllegalStateException("解码器缺少缓存输出：$outputName")
+                                }
+                                inputs[name] = prior.get(actualName).orElseThrow {
+                                    IllegalStateException("无法读取解码器缓存：$actualName")
+                                } as OnnxTensor
+                            }
+                        }
+                    }
+
+                    val result = try {
+                        decoder.run(inputs)
+                    } finally {
+                        inputIds.close()
+                        branchTensor?.close()
+                    }
+                    if (step == 0) emptyCaches.forEach { runCatching { it.close() } }
+                    // New outputs are available before the previous result is closed.
+                    if (step > 0) runCatching { previousResult?.close() }
+                    previousResult = null
+
+                    val logitsValue = if (outputNames.contains("logits")) {
+                        result.get("logits").orElse(result[0])
+                    } else result[0]
+                    val logits = logitsValue.value as Array<Array<FloatArray>>
+                    val nextId = argmax(logits[0][logits[0].lastIndex])
+                    if (nextId == eosId) {
+                        result.close()
+                        break
+                    }
+                    generated += nextId
+                    nextInputId = nextId
+                    previousResult = result
+                }
+
+                val translated = tgtSpm!!.decode(generated.drop(1).toIntArray())
+                TranslationResult(
+                    translatedText = translated,
+                    engineId = engineId,
+                    elapsedMillis = System.currentTimeMillis() - start,
+                )
+            } finally {
+                runCatching { previousResult?.close() }
+                emptyCaches.forEach { runCatching { it.close() } }
+                runCatching { hiddenTensor?.close() }
+                runCatching { encOut?.close() }
+                runCatching { srcTensor.close() }
+                runCatching { srcMaskTensor.close() }
             }
-
-            val translated = tgtSpm!!.decode(tgtIds.toIntArray())
-
-            runCatching { srcTensor.close() }
-            runCatching { srcMaskTensor.close() }
-            runCatching { encOut.close() }
-            runCatching { hiddenTensor.close() }
-
-            TranslationResult(
-                translatedText = translated,
-                engineId = engineId,
-                elapsedMillis = System.currentTimeMillis() - start,
-            )
         }
 
     private fun argmax(arr: FloatArray): Int {
