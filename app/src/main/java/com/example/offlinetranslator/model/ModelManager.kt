@@ -99,7 +99,6 @@ class ModelManager(
             // Do not advertise a model as ready when its runtime cannot load its layout.
             val files = dir.listFiles()?.filter { it.isFile }.orEmpty()
             fun file(name: String) = files.firstOrNull { it.name.equals(name, ignoreCase = true) }
-            val onnxFiles = files.filter { it.extension.equals("onnx", ignoreCase = true) }
             val tokens = file("tokens.txt")
 
             return when (category) {
@@ -118,7 +117,7 @@ class ModelManager(
                 ModelCategory.ASR -> {
                     val transducer = file("encoder.onnx") != null &&
                         file("decoder.onnx") != null && file("joiner.onnx") != null
-                    val paraformer = file("model.onnx") != null
+                    val paraformer = file("encoder.onnx") != null && file("decoder.onnx") != null
                     if (tokens == null || (!transducer && !paraformer)) null else Candidate(
                         category, dir, "asr-${dir.name.removePrefix("asr-")}", "SHERPA_ONNX", tokens.name,
                     )
@@ -249,7 +248,7 @@ class ModelManager(
             val transducer = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx").all {
                 File(dir, it).isFile
             }
-            val paraformer = File(dir, "model.onnx").isFile
+            val paraformer = File(dir, "encoder.onnx").isFile && File(dir, "decoder.onnx").isFile
             if (tokens != null && (transducer || paraformer)) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 out += ModelPack(
