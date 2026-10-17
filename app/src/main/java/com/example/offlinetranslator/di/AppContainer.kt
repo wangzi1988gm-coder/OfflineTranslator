@@ -11,6 +11,7 @@ import com.example.offlinetranslator.engine.translator.TranslatorRouter
 import com.example.offlinetranslator.engine.tts.TtsRouter
 import com.example.offlinetranslator.model.ModelManager
 import com.example.offlinetranslator.model.ModelStorage
+import kotlinx.coroutines.runBlocking
 
 /**
  * 简易 DI 容器。
@@ -47,7 +48,8 @@ class AppContainer(private val context: Context, val historyDao: HistoryDao) {
     }
 
     fun preload() {
-        modelManager
+        // Scan persisted model folders before preloading engines; otherwise startup sees an empty inventory.
+        runBlocking { modelManager.refresh() }
         translatorRouter.preloadAll()
         asrRouter.preload()
         ttsRouter.preload()
