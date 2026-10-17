@@ -60,7 +60,7 @@ class MlKitOcrEngine(private val context: Context) : OcrEngine {
             if (needChinese) {
                 val r = runRecognizer(chineseClient, image)
                 lines += r.lines.map { it.copy(script = detectScript(it.text)) }
-                scripts += r.scripts
+                scripts += r.detectedScripts
             }
 
             // 按行 y 坐标排序
