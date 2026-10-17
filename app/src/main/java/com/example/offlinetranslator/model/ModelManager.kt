@@ -110,12 +110,12 @@ class ModelManager(
                 }
                 ModelCategory.ASR -> {
                     if (onnx == null || tokens == null) null else Candidate(
-                        category, dir, "asr-${dir.name}", "SHERPA_ONNX", tokens.name,
+                        category, dir, "asr-${dir.name.removePrefix("asr-")}", "SHERPA_ONNX", tokens.name,
                     )
                 }
                 ModelCategory.TTS -> {
                     if (modelFile == null) null else Candidate(
-                        category, dir, "tts-${dir.name}", "SHERPA_ONNX_VITS", modelFile.name,
+                        category, dir, "tts-${dir.name.removePrefix("tts-")}", "SHERPA_ONNX_VITS", modelFile.name,
                     )
                 }
                 ModelCategory.OCR -> null
