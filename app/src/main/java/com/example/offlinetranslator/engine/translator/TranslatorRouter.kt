@@ -22,6 +22,7 @@ class TranslatorRouter(
     private val cascadeEngines = HashMap<String, TranslationEngine>()
     private val fallback = FallbackTranslator()
 
+    @Synchronized
     fun preloadAll() {
         // 加载所有已就绪的翻译引擎
         for (pack in modelManager.packsByCategory(ModelCategory.TRANSLATOR)) {
@@ -30,6 +31,7 @@ class TranslatorRouter(
         rebuildCascade()
     }
 
+    @Synchronized
     fun loadEngine(pack: ModelPack): TranslationEngine? {
         if (pack.engineImpl != "MARIAN_MT" && pack.engineImpl != "NLLB_200") return null
         val engine = marianFactory()
@@ -41,6 +43,7 @@ class TranslatorRouter(
         return null
     }
 
+    @Synchronized
     fun unloadEngine(slotKey: String) {
         directEngines.remove(slotKey)?.let { (it as? MarianMtEngine)?.unload() }
         rebuildCascade()
@@ -74,6 +77,7 @@ class TranslatorRouter(
         }
     }
 
+    @Synchronized
     fun pick(src: Language, tgt: Language): TranslationEngine {
         if (src == tgt) return IdentityTranslator()
         val pair = LanguagePair.of(src, tgt) ?: return fallback
@@ -90,6 +94,7 @@ class TranslatorRouter(
         return engine.translate(text, src, tgt)
     }
 
+    @Synchronized
     fun stats(): Map<String, Boolean> = buildMap {
         for (pair in LanguagePair.ALL) {
             put(pair.id, (directEngines[pair.id]?.isReady ?: false) || (cascadeEngines[pair.id]?.isReady ?: false))
