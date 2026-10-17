@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                     ModelManageViewModel(
                         modelStorage = container.modelStorage,
                         modelManager = container.modelManager,
+                        translatorRouter = container.translatorRouter,
                     )
                 }
                 val settingsVm: SettingsViewModel = SettingsViewModel(container.currentSettings())
