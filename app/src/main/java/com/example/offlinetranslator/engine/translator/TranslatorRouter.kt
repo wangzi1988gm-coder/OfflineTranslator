@@ -19,7 +19,7 @@ class TranslatorRouter(
     private val marianFactory: () -> MarianMtEngine,
 ) {
     private val directEngines = HashMap<String, TranslationEngine>()
-    private var cascadeEngine: TranslationEngine? = null
+    private val cascadeEngines = HashMap<String, TranslationEngine>()
     private val fallback = FallbackTranslator()
 
     fun preloadAll() {
@@ -47,11 +47,20 @@ class TranslatorRouter(
     }
 
     private fun rebuildCascade() {
-        cascadeEngine = null
-        val ruZh = directEngines["zh-ru"] ?: directEngines["ru-zh"]
-        val ruTg = directEngines["ru-tg"] ?: directEngines["tg-ru"]
-        if (ruZh != null && ruTg != null) {
-            cascadeEngine = CascadeTranslator(ruZh, ruTg, Language.RU)
+        cascadeEngines.clear()
+
+        // 中文 → 塔吉克：必须同时存在 zh-ru 与 ru-tg 两个方向的模型。
+        val zhRu = directEngines["zh-ru"]
+        val ruTg = directEngines["ru-tg"]
+        if (zhRu != null && ruTg != null) {
+            cascadeEngines["zh-tg"] = CascadeTranslator(zhRu, ruTg, Language.RU)
+        }
+
+        // 塔吉克 → 中文：必须同时存在 tg-ru 与 ru-zh 两个方向的模型。
+        val tgRu = directEngines["tg-ru"]
+        val ruZh = directEngines["ru-zh"]
+        if (tgRu != null && ruZh != null) {
+            cascadeEngines["tg-zh"] = CascadeTranslator(tgRu, ruZh, Language.RU)
         }
     }
 
@@ -61,7 +70,7 @@ class TranslatorRouter(
         // 直接
         directEngines[pair.id]?.let { if (it.isReady) return it }
         // 级联
-        cascadeEngine?.let { if (it.isReady) return it }
+        cascadeEngines[pair.id]?.let { if (it.isReady) return it }
         return fallback
     }
 
@@ -73,7 +82,7 @@ class TranslatorRouter(
 
     fun stats(): Map<String, Boolean> = buildMap {
         for (pair in LanguagePair.ALL) {
-            put(pair.id, (directEngines[pair.id]?.isReady ?: false) || (cascadeEngine?.isReady ?: false))
+            put(pair.id, (directEngines[pair.id]?.isReady ?: false) || (cascadeEngines[pair.id]?.isReady ?: false))
         }
     }
 }
