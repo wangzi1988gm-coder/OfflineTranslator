@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +47,7 @@ import com.example.offlinetranslator.data.ModelSlots
 import com.example.offlinetranslator.ui.component.StatusChip
 import com.example.offlinetranslator.ui.component.categoryColor
 import com.example.offlinetranslator.ui.component.sourceLabel
+import kotlinx.coroutines.launch
 
 @Composable
 fun ModelManageScreen(
@@ -54,6 +56,7 @@ fun ModelManageScreen(
     val packs by vm.packs.collectAsState()
     val loading by vm.loading.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { vm.refresh() }
 
@@ -96,7 +99,7 @@ fun ModelManageScreen(
                 Text("导入模型目录")
             }
             OutlinedButton(
-                onClick = { vm.refresh() },
+                onClick = { scope.launch { vm.refresh() } },
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
