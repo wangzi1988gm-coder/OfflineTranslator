@@ -103,8 +103,8 @@ class ModelManager(
 
             return when (category) {
                 ModelCategory.TRANSLATOR -> {
-                    val encoder = file("encoder.onnx")
-                    val decoder = file("decoder.onnx") ?: file("decoder_with_lm_head.onnx")
+                    val encoder = file("encoder.onnx") ?: file("encoder_model.onnx")
+                    val decoder = file("decoder.onnx") ?: file("decoder_model.onnx") ?: file("decoder_with_lm_head.onnx")
                     val tokenizerSrc = file("source.spm") ?: file("vocab.src")
                     val tokenizerTgt = file("target.spm") ?: file("vocab.tgt")
                     if (encoder == null || decoder == null || tokenizerSrc == null || tokenizerTgt == null) null
@@ -223,11 +223,15 @@ class ModelManager(
         val out = mutableListOf<ModelPack>()
         if (!storage.modelsRoot.exists()) return out
 
-        // translator/<key>/*.onnx
+        // translator/<key>：只有文件结构满足 Marian 引擎要求时才显示为已安装。
         File(storage.modelsRoot, "translator").listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
-            val onnx = dir.walkTopDown().firstOrNull { it.isFile && it.name.endsWith(".onnx") }
-            if (onnx != null) {
+            val files = dir.listFiles()?.filter { it.isFile }.orEmpty()
+            fun has(vararg names: String) = names.any { wanted -> files.any { it.name.equals(wanted, true) } }
+            val encoder = files.firstOrNull { it.name.equals("encoder.onnx", true) || it.name.equals("encoder_model.onnx", true) }
+            val decoderReady = has("decoder.onnx", "decoder_model.onnx", "decoder_with_lm_head.onnx")
+            val tokenizerReady = has("source.spm", "vocab.src") && has("target.spm", "vocab.tgt")
+            if (encoder != null && decoderReady && tokenizerReady) {
                 val size = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 out += ModelPack(
                     slotKey = dir.name,
@@ -235,7 +239,7 @@ class ModelManager(
                     engineImpl = detectTranslatorImpl(dir),
                     source = ModelSource.USER_IMPORTED,
                     rootDir = "translator/${dir.name}",
-                    primaryFile = onnx.name,
+                    primaryFile = encoder.name,
                     sizeBytes = size,
                 )
             }
