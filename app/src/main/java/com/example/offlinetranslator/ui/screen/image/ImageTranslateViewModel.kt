@@ -12,6 +12,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.offlinetranslator.data.Language
+import com.example.offlinetranslator.data.LanguagePair
 import com.example.offlinetranslator.engine.ocr.MlKitOcrEngine
 import com.example.offlinetranslator.engine.ocr.OcrLine
 import com.example.offlinetranslator.engine.ocr.OcrResult
@@ -66,8 +67,15 @@ class ImageTranslateViewModel(
     private val _status = MutableStateFlow<String?>(null)
     val status: StateFlow<String?> = _status.asStateFlow()
 
-    fun setFrom(lang: Language) { _fromLang.value = lang }
-    fun setTo(lang: Language) { _toLang.value = lang }
+    fun setFrom(lang: Language) {
+        _fromLang.value = lang
+        if (!LanguagePair.isSupported(lang, _toLang.value)) {
+            _toLang.value = if (lang == Language.ZH) Language.EN else Language.ZH
+        }
+    }
+    fun setTo(lang: Language) {
+        if (LanguagePair.isSupported(_fromLang.value, lang)) _toLang.value = lang
+    }
     fun setMode(mode: Mode) { _mode.value = mode }
 
     fun loadFromUri(context: Context, uri: Uri) {
