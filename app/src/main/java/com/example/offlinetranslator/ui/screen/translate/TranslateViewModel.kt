@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.offlinetranslator.data.AppSettings
 import com.example.offlinetranslator.data.HistoryEntity
 import com.example.offlinetranslator.data.Language
+import com.example.offlinetranslator.data.LanguagePair
 import com.example.offlinetranslator.data.SettingsCodec
 import com.example.offlinetranslator.data.TtsEnginePref
 import com.example.offlinetranslator.engine.asr.AsrRouter
@@ -60,10 +61,18 @@ class TranslateViewModel(
 
     fun setFrom(lang: Language) {
         _from.value = lang
+        // 只开放当前实现支持的六个方向：中文↔英语、中文↔俄语、中文↔塔吉克语。
+        if (!LanguagePair.isSupported(lang, _to.value)) {
+            _to.value = if (lang == Language.ZH) Language.EN else Language.ZH
+        }
+        _result.value = null
     }
 
     fun setTo(lang: Language) {
-        _to.value = lang
+        if (LanguagePair.isSupported(_from.value, lang)) {
+            _to.value = lang
+            _result.value = null
+        }
     }
 
     fun swap() {
