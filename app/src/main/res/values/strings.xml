@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">离线翻译</string>
+    <string name="app_name">离线通译</string>
     <string name="app_subtitle">中 · 英 · 俄 · 塔吉克</string>
-    <string name="share_image_label">用离线翻译打开图片</string>
+    <string name="share_image_label">用离线通译打开图片</string>
 
     <!-- 底部导航 -->
     <string name="nav_translate">翻译</string>
