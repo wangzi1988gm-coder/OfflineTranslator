@@ -16,8 +16,8 @@ android {
         applicationId = "com.example.offlinetranslator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.0-dev"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
