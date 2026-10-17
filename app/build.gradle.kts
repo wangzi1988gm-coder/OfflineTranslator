@@ -128,7 +128,10 @@ dependencies {
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
 
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.0")
-    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8")
+    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
+        // The Android AAR already packages these JVM classes; exclude the duplicate transitive JAR.
+        exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
+    }
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     testImplementation("junit:junit:4.13.2")
