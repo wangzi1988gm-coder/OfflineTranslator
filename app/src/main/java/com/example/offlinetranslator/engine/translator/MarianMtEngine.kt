@@ -49,6 +49,7 @@ class MarianMtEngine(
     private var maxLength: Int = 128
     private var decoderStartId: Int = 65000
     private var eosId: Int = 0
+    private var padId: Int = 65000
 
     @Volatile
     private var loaded: Boolean = false
@@ -84,8 +85,9 @@ class MarianMtEngine(
             decoderStartId = Regex("\\\"decoder_start_token_id\\\"\\s*:\\s*(\\d+)")
                 .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 65000
             eosId = Regex("\\\"eos_token_id\\\"\\s*:\\s*(\\d+)")
-                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                ?: tgtSpm?.idOrUnk(SentencePieceLite.EOS_TOKEN) ?: 0
+                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+            padId = Regex("\\\"pad_token_id\\\"\\s*:\\s*(\\d+)")
+                .find(configText)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: decoderStartId
 
             val env = OrtEnvironment.getEnvironment()
             val opts = OrtSession.SessionOptions().apply {
@@ -250,7 +252,7 @@ class MarianMtEngine(
                         result.get("logits").orElse(result[0])
                     } else result[0]
                     val logits = logitsValue.value as Array<Array<FloatArray>>
-                    val nextId = argmax(logits[0][logits[0].lastIndex])
+                    val nextId = argmax(logits[0][logits[0].lastIndex], setOf(padId, decoderStartId))
                     if (nextId == eosId) {
                         result.close()
                         break
@@ -276,13 +278,17 @@ class MarianMtEngine(
             }
         }
 
-    private fun argmax(arr: FloatArray): Int {
-        var bestIdx = 0
-        var bestVal = arr[0]
-        for (i in 1 until arr.size) {
-            if (arr[i] > bestVal) { bestVal = arr[i]; bestIdx = i }
+    private fun argmax(arr: FloatArray, excludedIds: Set<Int> = emptySet()): Int {
+        var bestIdx = -1
+        var bestVal = Float.NEGATIVE_INFINITY
+        for (i in arr.indices) {
+            if (i in excludedIds) continue
+            if (arr[i] > bestVal) {
+                bestVal = arr[i]
+                bestIdx = i
+            }
         }
-        return bestIdx
+        return if (bestIdx >= 0) bestIdx else arr.indices.firstOrNull { it !in excludedIds } ?: 0
     }
 
     companion object {
