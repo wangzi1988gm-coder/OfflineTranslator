@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
 
@@ -21,7 +22,6 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
-
         manifestPlaceholders["usesCleartextTraffic"] = "false"
     }
 
@@ -124,7 +124,6 @@ dependencies {
 
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
     implementation("com.k2fsa.sherpaonnx:sherpa-onnx:1.10.20")
-
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     testImplementation("junit:junit:4.13.2")
